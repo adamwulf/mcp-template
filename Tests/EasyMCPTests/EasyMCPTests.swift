@@ -4,6 +4,6 @@ import XCTest
 final class EasyMCPTests: XCTestCase {
     func testHello() throws {
         let mcp = EasyMCP()
-        XCTAssertEqual(mcp.hello(), "Hello from EasyMCP!")
+        XCTAssertEqual(mcp.hello(), "Hello from EasyMCP! MCP SDK is configured and ready.")
     }
 } 
