@@ -115,6 +115,34 @@ To use this template for your own MCP server:
 4. Modify the EasyMCP implementation to add your custom functionality
 5. Extend the command line example or create your own Mac application
 
+## Testing your MCP command line executable
+
+To test and debug your MCP server using the MCP Inspector:
+
+1. Build your command line executable in Xcode
+2. Locate the executable by going to Xcode → Product → Show Build Folder in Finder
+3. Copy the absolute path of the executable from that directory
+4. Use the [MCP Inspector](https://modelcontextprotocol.io/docs/tools/inspector) to test your server
+5. Open Terminal and run:
+   ```bash
+   npx @modelcontextprotocol/inspector <absolute_path_to_your_executable>
+   ```
+6. Open your browser to the port shown in the output:
+   ```
+   🔍 MCP Inspector is up and running at http://localhost:5173 🚀
+   ```
+7. Press the Connect button in the MCP Inspector interface
+8. Open Activity Monitor and search for your executable name
+9. Verify only the inspector and a single instance of your tool is running
+10. In Xcode → Debug → Attach to Process → Find your executable name at the top and attach
+11. Now you can interact with your server through the inspector while hitting breakpoints in Xcode!
+
+This setup provides a powerful debugging environment where you can:
+- Test your MCP server's functionality through the Inspector's UI
+- Set breakpoints in your code to trace execution
+- Inspect variables and state during operation
+- Debug resource, prompt, and tool implementations in real-time
+
 ## License
 
 [Insert license information here]
