@@ -135,13 +135,16 @@ To test and debug your MCP server using the MCP Inspector:
 8. Open Activity Monitor and search for your executable name
 9. Verify only the inspector and a single instance of your tool is running
 10. In Xcode → Debug → Attach to Process → Find your executable name at the top and attach
-11. Now you can interact with your server through the inspector while hitting breakpoints in Xcode!
+11. In Terminal, run `tail -n 20 -f ~/Library/Logs/Claude/mcp*.log`
+12. Now you can interact with your server through the inspector while hitting breakpoints in Xcode!
 
 This setup provides a powerful debugging environment where you can:
 - Test your MCP server's functionality through the Inspector's UI
 - Set breakpoints in your code to trace execution
 - Inspect variables and state during operation
 - Debug resource, prompt, and tool implementations in real-time
+
+For more debugging tips, visit [MCP Debugging](https://modelcontextprotocol.io/docs/tools/debugging) at Anthropic's modelcontextprotocol.io site.
 
 ## License
 

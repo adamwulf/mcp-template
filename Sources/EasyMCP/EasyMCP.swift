@@ -118,7 +118,7 @@ public final class EasyMCP: @unchecked Sendable {
     
     /// A simple example method
     public func hello() -> String {
-        return "Hello from EasyMCP! MCP SDK is configured and ready."
+        return "Hello iOS Folks! MCP SDK is configured and ready."
     }
     
     /// Helper function for structured logging in logfmt format
