@@ -16,6 +16,8 @@ public final class EasyMCP: @unchecked Sendable {
     private var serverTask: Task<Void, Swift.Error>?
     // Flag to track if server is running
     private var isRunning = false
+    // Logger instance
+    private let logger = Logger(label: "com.milestonemade.easymcp")
     
     /// Initializes a new EasyMCP instance
     public init() {
@@ -32,7 +34,7 @@ public final class EasyMCP: @unchecked Sendable {
     /// Start the MCP server with stdio transport
     public func start() async throws {
         guard !isRunning else {
-            print("Server is already running")
+            logger.info("Server is already running")
             return
         }
         
@@ -41,7 +43,6 @@ public final class EasyMCP: @unchecked Sendable {
         }
         
         // Create a transport for stdin/stdout communication
-        let logger = Logger(label: "com.easymcp.server")
         let stdioTransport = MCP.StdioTransport(logger: logger)
         self.transport = stdioTransport
         
@@ -53,9 +54,9 @@ public final class EasyMCP: @unchecked Sendable {
             do {
                 try await server.start(transport: stdioTransport)
                 isRunning = true
-                print("EasyMCP server started")
+                logger.info("EasyMCP server started")
             } catch {
-                print("Error starting EasyMCP server: \(error)")
+                logger.error("Error starting EasyMCP server: \(error)")
                 throw error
             }
         }
@@ -70,7 +71,7 @@ public final class EasyMCP: @unchecked Sendable {
         await server.stop()
         serverTask?.cancel()
         isRunning = false
-        print("EasyMCP server stopped")
+        logger.info("EasyMCP server stopped")
     }
     
     /// Register MCP tools
