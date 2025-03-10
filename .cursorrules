@@ -1,4 +1,4 @@
-Cursor Rules for Swift Package Projects
+# Cursor Rules for Swift Package Projects
 
 # Project Goals: MCP Template
 This project aims to create a simple command line executable and Swift package to make creating MCPs (Model Control Protocol) for Mac very easy. The project will eventually support:
@@ -6,14 +6,14 @@ This project aims to create a simple command line executable and Swift package t
 2. Command line stdio → standalone Mac app via Bonjour for networked MCP communication
 3. SSE server in a Package → example command line app for SSE-based MCP
 
-Main Workspace: mcp-template
-A basic Swift package template using Swift 6.0
-Currently minimal with no implementation code
-Located at: /Users/adamwulf/Developer/swift-packages/mcp-template
+## Main Workspace: mcp-template
+- A basic Swift package template using Swift 6.0
+- Currently minimal with no implementation code
+- Located at: /Users/adamwulf/Developer/swift-packages/mcp-template
 
-Related Projects (for reference only):
+## Related Projects (for reference only):
 
-1. hunch
+### 1. hunch
 Located at: /Users/adamwulf/Developer/swift-packages/hunch
 Description: A Swift package with CLI tool and library for interacting with various APIs
 Key components:
@@ -31,24 +31,24 @@ Structure:
   - NotionItems (various Notion-related items)
   - Commands (Activity, Blocks, Database, Export, Page)
 Files:
-hunch/Sources/hunch/Commands/PageCommand.swift
-hunch/Sources/hunch/Hunch.swift
-hunch/Sources/HunchKit/APIs/HunchAPI.swift
-hunch/Sources/HunchKit/APIs/NotionAPI.swift
-hunch/Sources/HunchKit/Helpers/FileDownloader.swift
-hunch/Sources/HunchKit/Helpers/FullJSONRenderer.swift
-hunch/Sources/HunchKit/Helpers/IDRenderer.swift
-hunch/Sources/HunchKit/Helpers/Logging.swift
-hunch/Sources/HunchKit/Helpers/MarkdownRenderer.swift
-hunch/Sources/HunchKit/Helpers/Renderer.swift
-hunch/Sources/HunchKit/Helpers/SmallJSONRenderer.swift
-hunch/Sources/HunchKit/Helpers/URLSession+Extensions.swift
-hunch/Sources/HunchKit/Lists/BlockList.swift
-hunch/Sources/HunchKit/Lists/DatabaseList.swift
-hunch/Sources/HunchKit/Lists/PageList.swift
+  - hunch/Sources/hunch/Commands/PageCommand.swift
+  - hunch/Sources/hunch/Hunch.swift
+  - hunch/Sources/HunchKit/APIs/HunchAPI.swift
+  - hunch/Sources/HunchKit/APIs/NotionAPI.swift
+  - hunch/Sources/HunchKit/Helpers/FileDownloader.swift
+  - hunch/Sources/HunchKit/Helpers/FullJSONRenderer.swift
+  - hunch/Sources/HunchKit/Helpers/IDRenderer.swift
+  - hunch/Sources/HunchKit/Helpers/Logging.swift
+  - hunch/Sources/HunchKit/Helpers/MarkdownRenderer.swift
+  - hunch/Sources/HunchKit/Helpers/Renderer.swift
+  - hunch/Sources/HunchKit/Helpers/SmallJSONRenderer.swift
+  - hunch/Sources/HunchKit/Helpers/URLSession+Extensions.swift
+  - hunch/Sources/HunchKit/Lists/BlockList.swift
+  - hunch/Sources/HunchKit/Lists/DatabaseList.swift
+  - hunch/Sources/HunchKit/Lists/PageList.swift
 
 
-2. mcp-swift-sdk
+### 2. mcp-swift-sdk
 Located at: /Users/adamwulf/Developer/swift-packages/mcp-swift-sdk
 Description: A Swift SDK for MCP (Model Control Protocol) implementation
 Key components:
@@ -60,23 +60,41 @@ Dependencies:
   - swift-system
   - swift-log
 Files:
-mcp-swift-sdk/Package.swift
-mcp-swift-sdk/Sources/MCP/Base/Error.swift
-mcp-swift-sdk/Sources/MCP/Base/ID.swift
-mcp-swift-sdk/Sources/MCP/Base/Lifecycle.swift
-mcp-swift-sdk/Sources/MCP/Base/Messages.swift
-mcp-swift-sdk/Sources/MCP/Base/Transports.swift
-mcp-swift-sdk/Sources/MCP/Base/Utilities/Ping.swift
-mcp-swift-sdk/Sources/MCP/Base/Value.swift
-mcp-swift-sdk/Sources/MCP/Base/Versioning.swift
-mcp-swift-sdk/Sources/MCP/Client/Client.swift
-mcp-swift-sdk/Sources/MCP/Extensions/Data+Extensions.swift
-mcp-swift-sdk/Sources/MCP/Server/Prompts.swift
-mcp-swift-sdk/Sources/MCP/Server/Resources.swift
-mcp-swift-sdk/Sources/MCP/Server/Server.swift
-mcp-swift-sdk/Sources/MCP/Server/Tools.swift
+  - mcp-swift-sdk/Package.swift
+  - mcp-swift-sdk/Sources/MCP/Base/Error.swift
+  - mcp-swift-sdk/Sources/MCP/Base/ID.swift
+  - mcp-swift-sdk/Sources/MCP/Base/Lifecycle.swift
+  - mcp-swift-sdk/Sources/MCP/Base/Messages.swift
+  - mcp-swift-sdk/Sources/MCP/Base/Transports.swift
+  - mcp-swift-sdk/Sources/MCP/Base/Utilities/Ping.swift
+  - mcp-swift-sdk/Sources/MCP/Base/Value.swift
+  - mcp-swift-sdk/Sources/MCP/Base/Versioning.swift
+  - mcp-swift-sdk/Sources/MCP/Client/Client.swift
+  - mcp-swift-sdk/Sources/MCP/Extensions/Data+Extensions.swift
+  - mcp-swift-sdk/Sources/MCP/Server/Prompts.swift
+  - mcp-swift-sdk/Sources/MCP/Server/Resources.swift
+  - mcp-swift-sdk/Sources/MCP/Server/Server.swift
+  - mcp-swift-sdk/Sources/MCP/Server/Tools.swift
 
-Platforms:
+### 3. iMCP
+Located at: /Users/adamwulf/Developer/swift/iMCP
+Description: A macOS app that implements the Model Control Protocol (MCP) for connecting macOS system data with AI tools like Claude Desktop
+Key components:
+  - iMCP.app: The main macOS application with UI for configuration and permissions management
+  - imcp-server: A CLI executable bundled with the app that handles stdin/stdout MCP communication
+  - App directory: Contains the main app implementation with SwiftUI views and service managers
+  - CLI directory: Contains the command-line interface implementation
+  - Services: Calendar, Contacts, Location, Messages, Reminders, and Weather services
+Architecture:
+  - Uses Bonjour for discovery between the CLI and app components
+  - Implements the MCP protocol for AI tool integration
+  - Handles Apple system permissions for each service
+  - Returns data in JSON-LD format
+Xcode targets:
+  - iMCP: The main app bundle
+  - imcp-server: The CLI executable
+
+## Platforms:
   - macOS 14+
   - iOS 17+
 
