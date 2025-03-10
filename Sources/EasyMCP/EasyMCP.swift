@@ -34,7 +34,7 @@ public final class EasyMCP: @unchecked Sendable {
     /// Start the MCP server with stdio transport
     public func start() async throws {
         guard !isRunning else {
-            logger.info("Server is already running")
+            logfmt(.info, ["msg": "Server is already running"])
             return
         }
         
@@ -54,9 +54,9 @@ public final class EasyMCP: @unchecked Sendable {
             do {
                 try await server.start(transport: stdioTransport)
                 isRunning = true
-                logger.info("EasyMCP server started")
+                logfmt(.info, ["msg": "EasyMCP server started"])
             } catch {
-                logger.error("Error starting EasyMCP server: \(error)")
+                logfmt(.error, ["msg": "Error starting EasyMCP server", "error": "\(error)"])
                 throw error
             }
         }
@@ -71,7 +71,7 @@ public final class EasyMCP: @unchecked Sendable {
         await server.stop()
         serverTask?.cancel()
         isRunning = false
-        logger.info("EasyMCP server stopped")
+        logfmt(.info, ["msg": "EasyMCP server stopped"])
     }
     
     /// Register MCP tools
@@ -119,5 +119,26 @@ public final class EasyMCP: @unchecked Sendable {
     /// A simple example method
     public func hello() -> String {
         return "Hello from EasyMCP! MCP SDK is configured and ready."
+    }
+    
+    /// Helper function for structured logging in logfmt format
+    private func logfmt(_ level: Logger.Level, _ pairs: [String: Any]) {
+        let message = pairs.map { key, value in
+            if let stringValue = value as? String, stringValue.contains(" ") {
+                return "\(key)=\"\(stringValue)\""
+            } else {
+                return "\(key)=\(value)"
+            }
+        }.joined(separator: " ")
+        
+        switch level {
+        case .trace: logger.trace("\(message)")
+        case .debug: logger.debug("\(message)")
+        case .info: logger.info("\(message)")
+        case .notice: logger.notice("\(message)")
+        case .warning: logger.warning("\(message)")
+        case .error: logger.error("\(message)")
+        case .critical: logger.critical("\(message)")
+        }
     }
 } 
