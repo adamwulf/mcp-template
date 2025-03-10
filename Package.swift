@@ -5,20 +5,33 @@ import PackageDescription
 
 let package = Package(
     name: "mcp-template",
+    platforms: [
+        .macOS(.v14)
+    ],
     products: [
         // Products define the executables and libraries a package produces, making them visible to other packages.
         .library(
-            name: "mcp-template",
-            targets: ["mcp-template"]),
+            name: "EasyMCP",
+            targets: ["EasyMCP"]),
+        .executable(
+            name: "mcpexample",
+            targets: ["mcpexample"])
+    ],
+    dependencies: [
+        // Dependencies declare other packages that this package depends on.
+        // .package(url: /* package url */, from: "1.0.0"),
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
         // Targets can depend on other targets in this package and products from dependencies.
         .target(
-            name: "mcp-template"),
+            name: "EasyMCP"),
+        .executableTarget(
+            name: "mcpexample",
+            dependencies: ["EasyMCP"]),
         .testTarget(
-            name: "mcp-templateTests",
-            dependencies: ["mcp-template"]
+            name: "EasyMCPTests",
+            dependencies: ["EasyMCP"]
         ),
     ]
 )
