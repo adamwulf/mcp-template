@@ -46,90 +46,62 @@ This project aims to create a simple command line executable and Swift package t
 
 ## Related Projects (for reference only):
 
-### 1. hunch
-Located at: /Users/adamwulf/Developer/swift-packages/hunch
-Description: A Swift package with CLI tool and library for interacting with various APIs
-Key components:
-  - HunchKit: A library for API interactions, rendering, and data handling
-  - hunch: A CLI executable with various commands
-Dependencies:
-  - swift-argument-parser
-  - SwiftToolbox
-  - Logfmt
-  - ytt (YouTube Transcript)
-Structure:
-  - APIs (NotionAPI, HunchAPI)
-  - Helpers (Renderers, Logging, Extensions)
-  - Lists (BlockList, DatabaseList, PageList)
-  - NotionItems (various Notion-related items)
-  - Commands (Activity, Blocks, Database, Export, Page)
-Files:
-  - hunch/Sources/hunch/Commands/PageCommand.swift
-  - hunch/Sources/hunch/Hunch.swift
-  - hunch/Sources/HunchKit/APIs/HunchAPI.swift
-  - hunch/Sources/HunchKit/APIs/NotionAPI.swift
-  - hunch/Sources/HunchKit/Helpers/FileDownloader.swift
-  - hunch/Sources/HunchKit/Helpers/FullJSONRenderer.swift
-  - hunch/Sources/HunchKit/Helpers/IDRenderer.swift
-  - hunch/Sources/HunchKit/Helpers/Logging.swift
-  - hunch/Sources/HunchKit/Helpers/MarkdownRenderer.swift
-  - hunch/Sources/HunchKit/Helpers/Renderer.swift
-  - hunch/Sources/HunchKit/Helpers/SmallJSONRenderer.swift
-  - hunch/Sources/HunchKit/Helpers/URLSession+Extensions.swift
-  - hunch/Sources/HunchKit/Lists/BlockList.swift
-  - hunch/Sources/HunchKit/Lists/DatabaseList.swift
-  - hunch/Sources/HunchKit/Lists/PageList.swift
+These projects are included in the reference-code folder for inspiration and guidance:
 
+### 1. mcp-swift-sdk
+- Description: Official Swift implementation of the Model Context Protocol (MCP)
+- Repository: https://github.com/loopwork-ai/mcp-swift-sdk
+- Structure:
+  - Package Type: Swift Package (Library)
+  - Swift Version: 6.0
+  - Platforms: macOS 14+, iOS 17+
+  - Main Target: MCP (Library)
+  - Dependencies: swift-system, swift-log
+- Key Features:
+  - Core MCP protocol implementation
+  - Client and Server implementations
+  - StdioTransport for command-line interaction
+  - Support for tools, resources, and prompts via MCP
+- Usage Examples:
+  - Basic client setup for connecting to MCP servers
+  - Server implementation for handling MCP requests
+  - Working with tools, resources, and prompts
 
-### 2. mcp-swift-sdk
-Located at: /Users/adamwulf/Developer/swift-packages/mcp-swift-sdk
-Description: A Swift SDK for MCP (Model Control Protocol) implementation
-Key components:
-  - Base (Error, ID, Lifecycle, Messages, Transports, Value, Versioning)
-  - Client (Client implementation with Info, Capabilities structures)
-  - Server (Prompts, Resources, Server, Tools)
-  - Extensions (Data extensions)
-Dependencies:
-  - swift-system
-  - swift-log
-Files:
-  - mcp-swift-sdk/Package.swift
-  - mcp-swift-sdk/Sources/MCP/Base/Error.swift
-  - mcp-swift-sdk/Sources/MCP/Base/ID.swift
-  - mcp-swift-sdk/Sources/MCP/Base/Lifecycle.swift
-  - mcp-swift-sdk/Sources/MCP/Base/Messages.swift
-  - mcp-swift-sdk/Sources/MCP/Base/Transports.swift
-  - mcp-swift-sdk/Sources/MCP/Base/Utilities/Ping.swift
-  - mcp-swift-sdk/Sources/MCP/Base/Value.swift
-  - mcp-swift-sdk/Sources/MCP/Base/Versioning.swift
-  - mcp-swift-sdk/Sources/MCP/Client/Client.swift
-  - mcp-swift-sdk/Sources/MCP/Extensions/Data+Extensions.swift
-  - mcp-swift-sdk/Sources/MCP/Server/Prompts.swift
-  - mcp-swift-sdk/Sources/MCP/Server/Resources.swift
-  - mcp-swift-sdk/Sources/MCP/Server/Server.swift
-  - mcp-swift-sdk/Sources/MCP/Server/Tools.swift
+### 2. iMCP
+- Description: macOS app for connecting digital life with AI via MCP
+- Repository: https://iMCP.app
+- Structure:
+  - Project Type: Xcode Project (App + CLI)
+  - Components:
+    - macOS App: Full-featured MCP server
+    - CLI: Command-line interface to the MCP server
+  - Organization:
+    - App/: Main SwiftUI application
+    - App/Services/: Core functionality services
+    - App/Integrations/: Various MCP integrations
+    - CLI/: Command-line implementation
+- Key Features:
+  - Calendar integration
+  - Contacts access
+  - Location services
+  - Messages access
+  - Reminders integration
+  - SwiftUI-based user interface
 
-### 3. iMCP
-Located at: /Users/adamwulf/Developer/swift/iMCP
-Description: A macOS app that implements the Model Control Protocol (MCP) for connecting macOS system data with AI tools like Claude Desktop
-Key components:
-  - iMCP.app: The main macOS application with UI for configuration and permissions management
-  - imcp-server: A CLI executable bundled with the app that handles stdin/stdout MCP communication
-  - App directory: Contains the main app implementation with SwiftUI views and service managers
-  - CLI directory: Contains the command-line interface implementation
-  - Services: Calendar, Contacts, Location, Messages, Reminders, and Weather services
-Architecture:
-  - Uses Bonjour for discovery between the CLI and app components
-  - Implements the MCP protocol for AI tool integration
-  - Handles Apple system permissions for each service
-  - Returns data in JSON-LD format
-Xcode targets:
-  - iMCP: The main app bundle
-  - imcp-server: The CLI executable
-
-## Platforms:
-  - macOS 14+
-  - iOS 17+
-
-This context file helps AI tools understand the relationship between these projects
-and their components to better assist with development tasks. 
+### 3. hunch
+- Description: Swift package with library and executable components
+- Structure:
+  - Package Type: Swift Package (Library + Executable)
+  - Swift Version: 5.9
+  - Platforms: macOS 13+, iOS 16+
+  - Targets:
+    - HunchKit: Library target with core functionality
+    - hunch: Executable target using ArgumentParser
+    - HunchKitTests: Test target for the library
+  - Dependencies:
+    - swift-argument-parser: CLI argument handling
+    - SwiftToolbox, Logfmt, YouTubeTranscriptKit: Utility libraries
+- Features:
+  - Example of a well-structured Swift package with both library and executable
+  - Shows proper separation of concerns between library and CLI code
+  - Demonstrates how to use ArgumentParser for command-line tools
