@@ -2,7 +2,8 @@ import Foundation
 import ArgumentParser
 import EasyMCP
 
-struct MCPExample: ParsableCommand {
+@main
+struct MCPExample: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "mcpexample",
         abstract: "MCP Example CLI - a simple interface for MCP (Model Control Protocol)",
@@ -10,28 +11,22 @@ struct MCPExample: ParsableCommand {
         subcommands: [
             HelloCommand.self,
             RunCommand.self
-        ],
-        defaultSubcommand: HelloCommand.self
+        ]
     )
 }
 
-struct HelloCommand: ParsableCommand {
+struct HelloCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "hello",
         abstract: "Display a hello message from EasyMCP"
     )
     
-    func run() throws {
+    func run() async throws {
         print("MCP Example CLI")
         print("--------------")
         
-        if #available(macOS 14.0, *) {
-            let mcp = EasyMCP()
-            print(mcp.hello())
-        } else {
-            print("This command requires macOS 14.0 or later.")
-            throw ExitCode.failure
-        }
+        let mcp = EasyMCP()
+        print(mcp.hello())
     }
 }
 
@@ -63,14 +58,12 @@ struct RunCommand: AsyncParsableCommand {
         try await mcp.start()
         
         // Keep the process alive until signal is received
-        dispatchMain()
+        while true {
+            do {
+                try await Task.sleep(for: .seconds(1))
+            } catch {
+                break // Exit the loop if Task is cancelled
+            }
+        }
     }
-}
-
-// Since we have an async command, we need to handle the async main
-if #available(macOS 14.0, *) {
-    MCPExample.main()
-} else {
-    print("This application requires macOS 14.0 or later.")
-    exit(1)
 } 

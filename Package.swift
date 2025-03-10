@@ -6,7 +6,7 @@ import PackageDescription
 let package = Package(
     name: "mcp-template",
     platforms: [
-        .macOS(.v14),
+        .macOS(.v15),
         .iOS(.v17),
         .macCatalyst(.v17)
     ],
