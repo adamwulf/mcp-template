@@ -1,0 +1,78 @@
+Cursor Rules for Swift Package Projects
+
+Main Workspace: mcp-template
+A basic Swift package template using Swift 6.0
+Currently minimal with no implementation code
+Located at: /Users/adamwulf/Developer/swift-packages/mcp-template
+
+Related Projects (for reference only):
+
+1. hunch
+Located at: /Users/adamwulf/Developer/swift-packages/hunch
+Description: A Swift package with CLI tool and library for interacting with various APIs
+Key components:
+  - HunchKit: A library for API interactions, rendering, and data handling
+  - hunch: A CLI executable with various commands
+Dependencies:
+  - swift-argument-parser
+  - SwiftToolbox
+  - Logfmt
+  - ytt (YouTube Transcript)
+Structure:
+  - APIs (NotionAPI, HunchAPI)
+  - Helpers (Renderers, Logging, Extensions)
+  - Lists (BlockList, DatabaseList, PageList)
+  - NotionItems (various Notion-related items)
+  - Commands (Activity, Blocks, Database, Export, Page)
+Files:
+hunch/Sources/hunch/Commands/PageCommand.swift
+hunch/Sources/hunch/Hunch.swift
+hunch/Sources/HunchKit/APIs/HunchAPI.swift
+hunch/Sources/HunchKit/APIs/NotionAPI.swift
+hunch/Sources/HunchKit/Helpers/FileDownloader.swift
+hunch/Sources/HunchKit/Helpers/FullJSONRenderer.swift
+hunch/Sources/HunchKit/Helpers/IDRenderer.swift
+hunch/Sources/HunchKit/Helpers/Logging.swift
+hunch/Sources/HunchKit/Helpers/MarkdownRenderer.swift
+hunch/Sources/HunchKit/Helpers/Renderer.swift
+hunch/Sources/HunchKit/Helpers/SmallJSONRenderer.swift
+hunch/Sources/HunchKit/Helpers/URLSession+Extensions.swift
+hunch/Sources/HunchKit/Lists/BlockList.swift
+hunch/Sources/HunchKit/Lists/DatabaseList.swift
+hunch/Sources/HunchKit/Lists/PageList.swift
+
+
+2. mcp-swift-sdk
+Located at: /Users/adamwulf/Developer/swift-packages/mcp-swift-sdk
+Description: A Swift SDK for MCP (Model Control Protocol) implementation
+Key components:
+  - Base (Error, ID, Lifecycle, Messages, Transports, Value, Versioning)
+  - Client (Client implementation with Info, Capabilities structures)
+  - Server (Prompts, Resources, Server, Tools)
+  - Extensions (Data extensions)
+Dependencies:
+  - swift-system
+  - swift-log
+Files:
+mcp-swift-sdk/Package.swift
+mcp-swift-sdk/Sources/MCP/Base/Error.swift
+mcp-swift-sdk/Sources/MCP/Base/ID.swift
+mcp-swift-sdk/Sources/MCP/Base/Lifecycle.swift
+mcp-swift-sdk/Sources/MCP/Base/Messages.swift
+mcp-swift-sdk/Sources/MCP/Base/Transports.swift
+mcp-swift-sdk/Sources/MCP/Base/Utilities/Ping.swift
+mcp-swift-sdk/Sources/MCP/Base/Value.swift
+mcp-swift-sdk/Sources/MCP/Base/Versioning.swift
+mcp-swift-sdk/Sources/MCP/Client/Client.swift
+mcp-swift-sdk/Sources/MCP/Extensions/Data+Extensions.swift
+mcp-swift-sdk/Sources/MCP/Server/Prompts.swift
+mcp-swift-sdk/Sources/MCP/Server/Resources.swift
+mcp-swift-sdk/Sources/MCP/Server/Server.swift
+mcp-swift-sdk/Sources/MCP/Server/Tools.swift
+
+Platforms:
+  - macOS 14+
+  - iOS 17+
+
+This context file helps AI tools understand the relationship between these projects
+and their components to better assist with development tasks. 
