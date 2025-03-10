@@ -82,9 +82,9 @@ public final class EasyMCP: @unchecked Sendable {
         await server.withMethodHandler(MCP.ListTools.self) { _ in
             // Define our hello tool
             let helloTool = MCP.Tool(
-                name: "hello",
+                name: "helloworld",
                 description: "Returns a friendly greeting message",
-                inputSchema: nil  // No input parameters needed for this simple example
+                inputSchema: ["type": "object", "properties": [:]]  // No input parameters needed for this simple example
             )
             
             return MCP.ListTools.Result(tools: [helloTool])
@@ -100,7 +100,7 @@ public final class EasyMCP: @unchecked Sendable {
             }
             
             // Handle the hello tool
-            if params.name == "hello" {
+            if params.name == "helloworld" {
                 let response = self.hello()
                 return MCP.CallTool.Result(
                     content: [.text(response)],

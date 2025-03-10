@@ -38,15 +38,12 @@ struct RunCommand: AsyncParsableCommand {
     )
     
     func run() async throws {
-        print("Starting MCP server...")
-        
         let mcp = EasyMCP()
         
         // Set up signal handling to gracefully exit
         let signalSource = DispatchSource.makeSignalSource(signal: SIGINT, queue: .main)
         signal(SIGINT, SIG_IGN)
         signalSource.setEventHandler {
-            print("\nShutting down MCP server...")
             Task {
                 await mcp.stop()
                 RunCommand.exit()
