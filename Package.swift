@@ -6,7 +6,9 @@ import PackageDescription
 let package = Package(
     name: "mcp-template",
     platforms: [
-        .macOS(.v14)
+        .macOS(.v14),
+        .iOS(.v17),
+        .macCatalyst(.v17)
     ],
     products: [
         // Products define the executables and libraries a package produces, making them visible to other packages.
