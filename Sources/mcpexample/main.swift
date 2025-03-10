@@ -1,11 +1,32 @@
 import Foundation
+import ArgumentParser
 import EasyMCP
 
-print("MCP Example CLI")
-print("--------------")
+struct MCPExample: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "mcpexample",
+        abstract: "MCP Example CLI - a simple interface for MCP (Model Control Protocol)",
+        version: "0.1.0",
+        subcommands: [
+            HelloCommand.self
+        ],
+        defaultSubcommand: HelloCommand.self
+    )
+}
 
-let mcp = EasyMCP()
-print(mcp.hello())
+struct HelloCommand: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "hello",
+        abstract: "Display a hello message from EasyMCP"
+    )
+    
+    func run() throws {
+        print("MCP Example CLI")
+        print("--------------")
+        
+        let mcp = EasyMCP()
+        print(mcp.hello())
+    }
+}
 
-// In a real app, you would implement command parsing and MCP interactions
-print("This is a placeholder for a full MCP implementation.") 
+MCPExample.main() 
