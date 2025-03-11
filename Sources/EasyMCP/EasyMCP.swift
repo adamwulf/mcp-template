@@ -34,7 +34,7 @@ public final class EasyMCP: @unchecked Sendable {
     /// Start the MCP server with stdio transport
     public func start() async throws {
         guard !isRunning else {
-            logfmt(.info, ["msg": "Server is already running"])
+            logger.logfmt(.info, ["msg": "Server is already running"])
             return
         }
 
@@ -54,9 +54,9 @@ public final class EasyMCP: @unchecked Sendable {
             do {
                 try await server.start(transport: stdioTransport)
                 isRunning = true
-                logfmt(.info, ["msg": "EasyMCP server started"])
+                logger.logfmt(.info, ["msg": "EasyMCP server started"])
             } catch {
-                logfmt(.error, ["msg": "Error starting EasyMCP server", "error": "\(error)"])
+                logger.logfmt(.error, ["msg": "Error starting EasyMCP server", "error": "\(error)"])
                 throw error
             }
         }
@@ -74,7 +74,7 @@ public final class EasyMCP: @unchecked Sendable {
                 try await serverTask.value
             }
         } catch {
-            logfmt(.error, ["msg": "Error in server task", "error": "\(error)"])
+            logger.logfmt(.error, ["msg": "Error in server task", "error": "\(error)"])
         }
     }
 
@@ -87,7 +87,7 @@ public final class EasyMCP: @unchecked Sendable {
         await server.stop()
         serverTask?.cancel()
         isRunning = false
-        logfmt(.info, ["msg": "EasyMCP server stopped"])
+        logger.logfmt(.info, ["msg": "EasyMCP server stopped"])
     }
 
     /// Register MCP tools
@@ -135,30 +135,5 @@ public final class EasyMCP: @unchecked Sendable {
     /// A simple example method
     public func hello() -> String {
         return "Hello iOS Folks! MCP SDK is configured and ready."
-    }
-
-    /// Helper function for structured logging in logfmt format
-    private func logfmt(_ level: Logger.Level, _ pairs: [String: Any]) {
-        let message = pairs.map { key, value in
-            if let stringValue = value as? String, stringValue.contains(" ") {
-                return "\(key)=\"\(stringValue)\""
-            } else {
-                return "\(key)=\(value)"
-            }
-        }.joined(separator: " ")
-
-        // Log using the SwiftLog logger
-        switch level {
-        case .trace: logger.trace("\(message)")
-        case .debug: logger.debug("\(message)")
-        case .info: logger.info("\(message)")
-        case .notice: logger.notice("\(message)")
-        case .warning: logger.warning("\(message)")
-        case .error: logger.error("\(message)")
-        case .critical: logger.critical("\(message)")
-        }
-
-        // The FileLogHandler is now registered with LoggingSystem in the init method
-        // so all logs through the logger will be automatically written to the file
     }
 }
