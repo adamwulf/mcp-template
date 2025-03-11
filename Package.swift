@@ -22,7 +22,7 @@ let package = Package(
     dependencies: [
         // Dependencies declare other packages that this package depends on.
         .package(url: "https://github.com/apple/swift-argument-parser", from: "1.3.0"),
-        .package(url: "https://github.com/adamwulf/mcp-swift-sdk", branch: "feature/wait-for-complete"),
+        .package(url: "https://github.com/adamwulf/mcp-swift-sdk", branch: "feature/wait-for-complete")
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
@@ -30,7 +30,7 @@ let package = Package(
         .target(
             name: "EasyMCP",
             dependencies: [
-                .product(name: "MCP", package: "mcp-swift-sdk"),
+                .product(name: "MCP", package: "mcp-swift-sdk")
             ]),
         .executableTarget(
             name: "mcpexample",
@@ -41,6 +41,6 @@ let package = Package(
         .testTarget(
             name: "EasyMCPTests",
             dependencies: ["EasyMCP"]
-        ),
+        )
     ]
 )
