@@ -12,6 +12,10 @@ public typealias Result = MCP.CallTool.Result
 @available(macOS 14.0, *)
 public final class EasyMCP: @unchecked Sendable {
 
+    enum Error: Swift.Error {
+        case serverHasNotStarted
+    }
+
     private struct ToolMeta {
         let tool: MCP.Tool
         let handler: ([String: Value]) async throws -> Result
@@ -41,6 +45,8 @@ public final class EasyMCP: @unchecked Sendable {
             )
         )
     }
+
+    // MARK: - Server Lifecycle
 
     /// Start the MCP server with stdio transport
     public func start() async throws {
@@ -91,7 +97,27 @@ public final class EasyMCP: @unchecked Sendable {
         logger.logfmt(.info, ["msg": "EasyMCP server stopped"])
     }
 
-    /// Register MCP tools
+    // MARK: - Tools
+
+    // Register a tool with the server. The server must already be started to register a tool.
+    public func register(tool: Tool, handler: @escaping ([String: Value]) async throws -> Result) async throws {
+        guard let server = server else { return }
+        if tool.inputSchema == nil {
+            let inputSchema: Value = ["type": "object", "properties": [:]]
+            let toolWithSchema = Tool(name: tool.name, description: tool.description, inputSchema: inputSchema)
+            tools[tool.name] = ToolMeta(tool: toolWithSchema, handler: handler)
+        } else {
+            tools[tool.name] = ToolMeta(tool: tool, handler: handler)
+        }
+
+        if isRunning {
+            try await server.notify(ToolListChangedNotification.message())
+        }
+    }
+
+    // MARK: - Private
+
+    /// Register MCP handlers to list and call tools
     private func registerTools() async {
         guard let server = server else { return }
 
@@ -121,11 +147,5 @@ public final class EasyMCP: @unchecked Sendable {
 
             return try await toolMeta.handler(params.arguments ?? [:])
         }
-    }
-
-    public func register(tool: Tool, handler: @escaping ([String: Value]) async throws -> Result) async throws {
-        guard let server = server else { return }
-        tools[tool.name] = ToolMeta(tool: tool, handler: handler)
-        try await server.notify(ToolListChangedNotification.message())
     }
 }

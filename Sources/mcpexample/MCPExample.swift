@@ -22,6 +22,7 @@ struct RunCommand: AsyncParsableCommand {
     )
 
     func run() async throws {
+        // build server
         let mcp = EasyMCP()
 
         // Set up signal handling to gracefully exit
@@ -35,14 +36,10 @@ struct RunCommand: AsyncParsableCommand {
         }
         signalSource.resume()
 
-        // Start the server and keep it running
-        try await mcp.start()
-
         // Register a simple tool with no input
         try await mcp.register(tool: Tool(
             name: "helloWorld",
-            description: "Returns a friendly greeting message",
-            inputSchema: ["type": "object", "properties": [:]]  // No input parameters needed for this simple example
+            description: "Returns a friendly greeting message"
         )) { input in
             return Result(content: [.text(helloworld())], isError: false)
         }
@@ -63,6 +60,9 @@ struct RunCommand: AsyncParsableCommand {
         )) { input in
             return Result(content: [.text(hello(input["name"]?.stringValue ?? "world"))], isError: false)
         }
+
+        // Start the server and keep it running
+        try await mcp.start()
 
         // Wait until the server is finished processing all input
         try await mcp.waitUntilComplete()
