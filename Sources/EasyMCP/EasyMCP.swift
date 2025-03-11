@@ -62,21 +62,11 @@ public final class EasyMCP: @unchecked Sendable {
         }
     }
 
-    public func waitUntilComplete() async {
-        try? await serverTask?.value
+    public func waitUntilComplete() async throws {
+        try await serverTask?.value
         await server?.waitUntilComplete()
     }
 
-    public func waitUntilDone() async {
-        do {
-            // Use try to handle potential errors from the task
-            if let serverTask = serverTask {
-                try await serverTask.value
-            }
-        } catch {
-            logger.logfmt(.error, ["msg": "Error in server task", "error": "\(error)"])
-        }
-    }
 
     /// Stop the MCP server
     public func stop() async {

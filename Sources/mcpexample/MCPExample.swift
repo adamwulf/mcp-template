@@ -53,6 +53,6 @@ struct RunCommand: AsyncParsableCommand {
 
         // Start the server and keep it running
         try await mcp.start()
-        await mcp.waitUntilComplete()
+        try await mcp.waitUntilComplete()
     }
 }
