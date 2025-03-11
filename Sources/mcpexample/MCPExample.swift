@@ -53,14 +53,6 @@ struct RunCommand: AsyncParsableCommand {
         
         // Start the server and keep it running
         try await mcp.start()
-        
-        // Keep the process alive until signal is received
-        while true {
-            do {
-                try await Task.sleep(for: .seconds(1))
-            } catch {
-                break // Exit the loop if Task is cancelled
-            }
-        }
+        await mcp.waitUntilComplete()
     }
 } 

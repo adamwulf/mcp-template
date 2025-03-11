@@ -1,13 +1,13 @@
 {
-  "originHash" : "3d200578a605814047a42d575dd91d4a16bb09196590ce8029731862c01b5c20",
+  "originHash" : "5b2d3edd9b72048e146719d193f7e5fe5227981e52be31e042d4e7eeca23444e",
   "pins" : [
     {
       "identity" : "mcp-swift-sdk",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/loopwork-ai/mcp-swift-sdk",
+      "location" : "https://github.com/adamwulf/mcp-swift-sdk",
       "state" : {
-        "branch" : "main",
-        "revision" : "9ebe12559ed4c829929d35f39df2a4177906ff9f"
+        "branch" : "feature/wait-for-complete",
+        "revision" : "2271710782a6c406774f853eb651fe3c184b1e5f"
       }
     },
     {

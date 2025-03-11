@@ -18,7 +18,7 @@ public final class EasyMCP: @unchecked Sendable {
     private var isRunning = false
     // Logger instance
     private let logger = Logger(label: "com.milestonemade.easymcp")
-    
+
     /// Initializes a new EasyMCP instance
     public init() {
         // Initialize the MCP server with basic capabilities
@@ -30,7 +30,7 @@ public final class EasyMCP: @unchecked Sendable {
             )
         )
     }
-    
+
     /// Start the MCP server with stdio transport
     public func start() async throws {
         guard !isRunning else {
@@ -61,7 +61,23 @@ public final class EasyMCP: @unchecked Sendable {
             }
         }
     }
-    
+
+    public func waitUntilComplete() async {
+        try? await serverTask?.value
+        await server?.waitUntilComplete()
+    }
+
+    public func waitUntilDone() async {
+        do {
+            // Use try to handle potential errors from the task
+            if let serverTask = serverTask {
+                try await serverTask.value
+            }
+        } catch {
+            logfmt(.error, ["msg": "Error in server task", "error": "\(error)"])
+        }
+    }
+
     /// Stop the MCP server
     public func stop() async {
         guard isRunning, let server = server else {
@@ -131,6 +147,7 @@ public final class EasyMCP: @unchecked Sendable {
             }
         }.joined(separator: " ")
         
+        // Log using the SwiftLog logger
         switch level {
         case .trace: logger.trace("\(message)")
         case .debug: logger.debug("\(message)")
@@ -140,5 +157,8 @@ public final class EasyMCP: @unchecked Sendable {
         case .error: logger.error("\(message)")
         case .critical: logger.critical("\(message)")
         }
+        
+        // The FileLogHandler is now registered with LoggingSystem in the init method
+        // so all logs through the logger will be automatically written to the file
     }
 } 
