@@ -18,7 +18,7 @@ public final class EasyMCP: @unchecked Sendable {
     private var isRunning = false
     // Logger instance
     private let logger = Logger(label: "com.milestonemade.easymcp")
-    
+
     /// Initializes a new EasyMCP instance
     public init() {
         // Initialize the MCP server with basic capabilities
@@ -30,54 +30,60 @@ public final class EasyMCP: @unchecked Sendable {
             )
         )
     }
-    
+
     /// Start the MCP server with stdio transport
     public func start() async throws {
         guard !isRunning else {
-            logfmt(.info, ["msg": "Server is already running"])
+            logger.logfmt(.info, ["msg": "Server is already running"])
             return
         }
-        
+
         guard let server = server else {
             throw NSError(domain: "EasyMCP", code: 1, userInfo: [NSLocalizedDescriptionKey: "Server not initialized"])
         }
-        
+
         // Create a transport for stdin/stdout communication
         let stdioTransport = MCP.StdioTransport(logger: logger)
         self.transport = stdioTransport
-        
+
         // Register tool handlers
         await registerTools()
-        
+
         // Start the server
         serverTask = Task<Void, Swift.Error> {
             do {
                 try await server.start(transport: stdioTransport)
                 isRunning = true
-                logfmt(.info, ["msg": "EasyMCP server started"])
+                logger.logfmt(.info, ["msg": "EasyMCP server started"])
             } catch {
-                logfmt(.error, ["msg": "Error starting EasyMCP server", "error": "\(error)"])
+                logger.logfmt(.error, ["msg": "Error starting EasyMCP server", "error": "\(error)"])
                 throw error
             }
         }
     }
-    
+
+    public func waitUntilComplete() async throws {
+        try await serverTask?.value
+        await server?.waitUntilComplete()
+    }
+
+
     /// Stop the MCP server
     public func stop() async {
         guard isRunning, let server = server else {
             return
         }
-        
+
         await server.stop()
         serverTask?.cancel()
         isRunning = false
-        logfmt(.info, ["msg": "EasyMCP server stopped"])
+        logger.logfmt(.info, ["msg": "EasyMCP server stopped"])
     }
-    
+
     /// Register MCP tools
     private func registerTools() async {
         guard let server = server else { return }
-        
+
         // Register the tools/list handler
         await server.withMethodHandler(MCP.ListTools.self) { _ in
             // Define our hello tool
@@ -86,10 +92,10 @@ public final class EasyMCP: @unchecked Sendable {
                 description: "Returns a friendly greeting message",
                 inputSchema: ["type": "object", "properties": [:]]  // No input parameters needed for this simple example
             )
-            
+
             return MCP.ListTools.Result(tools: [helloTool])
         }
-        
+
         // Register the tools/call handler
         await server.withMethodHandler(MCP.CallTool.self) { [weak self] params in
             guard let self = self else {
@@ -98,7 +104,7 @@ public final class EasyMCP: @unchecked Sendable {
                     isError: true
                 )
             }
-            
+
             // Handle the hello tool
             if params.name == "helloworld" {
                 let response = self.hello()
@@ -107,7 +113,7 @@ public final class EasyMCP: @unchecked Sendable {
                     isError: false
                 )
             }
-            
+
             // Tool not found
             return MCP.CallTool.Result(
                 content: [.text("Tool not found: \(params.name)")],
@@ -115,30 +121,9 @@ public final class EasyMCP: @unchecked Sendable {
             )
         }
     }
-    
+
     /// A simple example method
     public func hello() -> String {
         return "Hello iOS Folks! MCP SDK is configured and ready."
     }
-    
-    /// Helper function for structured logging in logfmt format
-    private func logfmt(_ level: Logger.Level, _ pairs: [String: Any]) {
-        let message = pairs.map { key, value in
-            if let stringValue = value as? String, stringValue.contains(" ") {
-                return "\(key)=\"\(stringValue)\""
-            } else {
-                return "\(key)=\(value)"
-            }
-        }.joined(separator: " ")
-        
-        switch level {
-        case .trace: logger.trace("\(message)")
-        case .debug: logger.debug("\(message)")
-        case .info: logger.info("\(message)")
-        case .notice: logger.notice("\(message)")
-        case .warning: logger.warning("\(message)")
-        case .error: logger.error("\(message)")
-        case .critical: logger.critical("\(message)")
-        }
-    }
-} 
+}

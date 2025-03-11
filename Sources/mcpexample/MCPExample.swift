@@ -20,11 +20,11 @@ struct HelloCommand: AsyncParsableCommand {
         commandName: "hello",
         abstract: "Display a hello message from EasyMCP"
     )
-    
+
     func run() async throws {
         print("MCP Example CLI")
         print("--------------")
-        
+
         let mcp = EasyMCP()
         print(mcp.hello())
     }
@@ -36,10 +36,10 @@ struct RunCommand: AsyncParsableCommand {
         commandName: "run",
         abstract: "Start the MCP server to handle MCP protocol communications"
     )
-    
+
     func run() async throws {
         let mcp = EasyMCP()
-        
+
         // Set up signal handling to gracefully exit
         let signalSource = DispatchSource.makeSignalSource(signal: SIGINT, queue: .main)
         signal(SIGINT, SIG_IGN)
@@ -50,17 +50,9 @@ struct RunCommand: AsyncParsableCommand {
             }
         }
         signalSource.resume()
-        
+
         // Start the server and keep it running
         try await mcp.start()
-        
-        // Keep the process alive until signal is received
-        while true {
-            do {
-                try await Task.sleep(for: .seconds(1))
-            } catch {
-                break // Exit the loop if Task is cancelled
-            }
-        }
+        try await mcp.waitUntilComplete()
     }
-} 
+}
