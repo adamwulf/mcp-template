@@ -8,6 +8,12 @@ import Logging
 /// Main class for handling MCP (Model Control Protocol) communications
 @available(macOS 14.0, *)
 public final class EasyMCP: @unchecked Sendable {
+
+    private struct ToolMeta {
+        let tool: MCP.Tool
+        let handler: (CallTool.Parameters) async throws -> Void
+    }
+
     // Internal MCP instance
     private var server: MCP.Server?
     // Transport instance
@@ -18,6 +24,8 @@ public final class EasyMCP: @unchecked Sendable {
     private var isRunning = false
     // Logger instance
     private let logger = Logger(label: "com.milestonemade.easymcp")
+    // Tools
+    private var tools: [String: ToolMeta] = [:]
 
     /// Initializes a new EasyMCP instance
     public init() {
@@ -148,6 +156,12 @@ public final class EasyMCP: @unchecked Sendable {
                 )
             }
         }
+    }
+
+    func register(tool: Tool, handler: @escaping (CallTool.Parameters) async throws -> Void) async throws {
+        guard let server = server else { return }
+        tools[tool.name] = ToolMeta(tool: tool, handler: handler)
+        try await server.notify(ToolListChangedNotification.message())
     }
 
     /// A simple example method
