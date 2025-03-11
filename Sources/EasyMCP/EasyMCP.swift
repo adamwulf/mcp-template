@@ -30,12 +30,13 @@ public final class EasyMCP: @unchecked Sendable {
     // Flag to track if server is running
     private var isRunning = false
     // Logger instance
-    private let logger = Logger(label: "com.milestonemade.easymcp")
+    private let logger: Logger?
     // Tools
     private var tools: [String: ToolMeta] = [:]
 
     /// Initializes a new EasyMCP instance
-    public init() {
+    public init(logger: Logger? = nil) {
+        self.logger = logger
         // Initialize the MCP server with basic capabilities
         server = MCP.Server(
             name: "EasyMCP",
@@ -51,7 +52,7 @@ public final class EasyMCP: @unchecked Sendable {
     /// Start the MCP server with stdio transport
     public func start() async throws {
         guard !isRunning else {
-            logger.logfmt(.info, ["msg": "Server is already running"])
+            logger?.logfmt(.info, ["msg": "Server is already running"])
             return
         }
 
@@ -71,9 +72,9 @@ public final class EasyMCP: @unchecked Sendable {
             do {
                 try await server.start(transport: stdioTransport)
                 isRunning = true
-                logger.logfmt(.info, ["msg": "EasyMCP server started"])
+                logger?.logfmt(.info, ["msg": "EasyMCP server started"])
             } catch {
-                logger.logfmt(.error, ["msg": "Error starting EasyMCP server", "error": "\(error)"])
+                logger?.logfmt(.error, ["msg": "Error starting EasyMCP server", "error": "\(error)"])
                 throw error
             }
         }
@@ -94,7 +95,7 @@ public final class EasyMCP: @unchecked Sendable {
         await server.stop()
         serverTask?.cancel()
         isRunning = false
-        logger.logfmt(.info, ["msg": "EasyMCP server stopped"])
+        logger?.logfmt(.info, ["msg": "EasyMCP server stopped"])
     }
 
     // MARK: - Tools

@@ -1,6 +1,7 @@
 import Foundation
 import ArgumentParser
 import EasyMCP
+import Logging
 
 @main
 struct MCPExample: AsyncParsableCommand {
@@ -23,7 +24,8 @@ struct RunCommand: AsyncParsableCommand {
 
     func run() async throws {
         // build server
-        let mcp = EasyMCP()
+        let logger = Logger(label: "com.milestonemade.easymcp")
+        let mcp = EasyMCP(logger: logger)
 
         // Set up signal handling to gracefully exit
         let signalSource = DispatchSource.makeSignalSource(signal: SIGINT, queue: .main)
@@ -59,6 +61,20 @@ struct RunCommand: AsyncParsableCommand {
             ]
         )) { input in
             return Result(content: [.text(hello(input["name"]?.stringValue ?? "world"))], isError: false)
+        }
+
+        Task {
+            try await Task.sleep(for: .seconds(5))
+            logger.error("registering extra tool")
+
+            // Register a simple tool with no input
+            try await mcp.register(tool: Tool(
+                name: "helloEveryone",
+                description: "Returns a friendly greeting message to everyone around"
+            )) { input in
+                return Result(content: [.text(helloworld())], isError: false)
+            }
+            logger.error("registered extra tool")
         }
 
         // Start the server and keep it running
