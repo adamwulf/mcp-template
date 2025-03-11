@@ -63,6 +63,9 @@ struct RunCommand: AsyncParsableCommand {
             return Result(content: [.text(hello(input["name"]?.stringValue ?? "world"))], isError: false)
         }
 
+        // Start the server and keep it running
+        try await mcp.start()
+
         Task {
             try await Task.sleep(for: .seconds(5))
             logger.error("registering extra tool")
@@ -76,9 +79,6 @@ struct RunCommand: AsyncParsableCommand {
             }
             logger.error("registered extra tool")
         }
-
-        // Start the server and keep it running
-        try await mcp.start()
 
         // Wait until the server is finished processing all input
         try await mcp.waitUntilComplete()
