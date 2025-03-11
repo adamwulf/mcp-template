@@ -18,8 +18,8 @@ This repository is intended to be:
 Current and planned features include:
 
 - [x] Basic Swift package structure
-- [x] Command line "hello world" example
-- [ ] Command line stdio for direct MCP interaction
+- [x] Command line "hello world" example tool
+- [x] Command line stdio for direct MCP interaction via the `run` command
 - [ ] Command line stdio → standalone Mac app via Bonjour for networked MCP communication
 - [ ] SSE server in a Package → example command line app for SSE-based MCP
 
@@ -63,9 +63,12 @@ import EasyMCP
 // Create an instance of EasyMCP
 let mcp = EasyMCP()
 
-// Use MCP for AI interactions
-let response = try await mcp.process("Hello, how can you help me today?")
-print(response)
+// Use the hello example
+print(mcp.hello())
+
+// Start the MCP server for full MCP interaction
+try await mcp.start()
+try await mcp.waitUntilComplete()
 ```
 
 ### Command Line Example
@@ -73,8 +76,11 @@ print(response)
 The package includes a command line executable called `mcpexample` that demonstrates basic usage:
 
 ```bash
-# Run the example with a hello command
+# Run the basic hello example
 mcpexample hello
+
+# Start the MCP server to handle MCP protocol communications
+mcpexample run
 ```
 
 ## Project Structure
@@ -85,19 +91,22 @@ mcpexample hello
    - Minimal template implementation of an MCP server
    - Demonstrates basic integration with the MCP protocol
    - Shows how to leverage the official `mcp-swift-sdk`
+   - Includes a simple tool example (helloworld)
 
 2. **mcpexample** (Executable)
    - Simple command-line example using the EasyMCP library
-   - Demonstrates how to create a CLI-based MCP server
+   - Includes both a hello command and a run command
+   - The run command starts a full MCP server using stdio transport
    - Uses `ArgumentParser` for CLI argument handling
 
 3. **EasyMCPTests** (Test Target)
    - Template tests for the EasyMCP library functionality
+   - Includes a basic test for the hello function
 
 ### Dependencies
 
 - [swift-argument-parser](https://github.com/apple/swift-argument-parser) (1.3.0+) - Used for CLI argument handling
-- [mcp-swift-sdk](https://github.com/loopwork-ai/mcp-swift-sdk) (main branch) - Core MCP implementation from loopwork-ai
+- [mcp-swift-sdk](https://github.com/adamwulf/mcp-swift-sdk) (branch: "feature/wait-for-complete") - Custom fork of the MCP implementation that adds the ability to wait for the mcp server to finish
 
 ## Development
 
@@ -125,7 +134,7 @@ To test and debug your MCP server using the MCP Inspector:
 4. Use the [MCP Inspector](https://modelcontextprotocol.io/docs/tools/inspector) to test your server
 5. Open Terminal and run:
    ```bash
-   npx @modelcontextprotocol/inspector <absolute_path_to_your_executable>
+   npx @modelcontextprotocol/inspector <absolute_path_to_your_executable> run
    ```
 6. Open your browser to the port shown in the output:
    ```

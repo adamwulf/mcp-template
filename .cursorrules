@@ -1,4 +1,5 @@
 # Cursor Rules for Swift Package Projects
+- Before making any changes or edits, talk through and mention your plan for the changes.
 
 # Project Goals: MCP Template
 This project aims to create a simple command line executable and Swift package to make creating MCPs (Model Control Protocol) for Mac very easy. The project will eventually support:
