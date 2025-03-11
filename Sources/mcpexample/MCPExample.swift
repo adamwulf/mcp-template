@@ -26,7 +26,7 @@ struct HelloCommand: AsyncParsableCommand {
         print("--------------")
 
         let mcp = EasyMCP()
-        print(mcp.hello())
+        print(mcp.helloworld())
     }
 }
 

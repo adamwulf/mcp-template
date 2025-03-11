@@ -87,13 +87,27 @@ public final class EasyMCP: @unchecked Sendable {
         // Register the tools/list handler
         await server.withMethodHandler(MCP.ListTools.self) { _ in
             // Define our hello tool
-            let helloTool = MCP.Tool(
-                name: "helloworld",
+            let helloWorldTool = MCP.Tool(
+                name: "helloWorld",
                 description: "Returns a friendly greeting message",
                 inputSchema: ["type": "object", "properties": [:]]  // No input parameters needed for this simple example
             )
 
-            return MCP.ListTools.Result(tools: [helloTool])
+            let helloPersonTool = MCP.Tool(
+                name: "helloPerson",
+                description: "Returns a friendly greeting message",
+                inputSchema: [
+                    "type": "object",
+                    "properties": [
+                        "name": [
+                            "type": "string",
+                            "description": "Name to search for (will match given name or family name)",
+                        ]
+                    ]
+                ]
+            )
+
+            return MCP.ListTools.Result(tools: [helloWorldTool, helloPersonTool])
         }
 
         // Register the tools/call handler
@@ -105,25 +119,43 @@ public final class EasyMCP: @unchecked Sendable {
                 )
             }
 
-            // Handle the hello tool
-            if params.name == "helloworld" {
-                let response = self.hello()
+            switch params.name {
+            case "helloWorld":
+                let response = self.helloworld()
                 return MCP.CallTool.Result(
                     content: [.text(response)],
                     isError: false
                 )
+            case "helloPerson":
+                guard
+                    let args = params.arguments,
+                    let name = args["name"]?.stringValue
+                else {
+                    return MCP.CallTool.Result(
+                        content: [.text("Missing parameter 'name' for tool: \(params.name)")],
+                        isError: true
+                    )
+                }
+                let response = self.hello(name)
+                return MCP.CallTool.Result(
+                    content: [.text(response)],
+                    isError: false
+                )
+            default:
+                return MCP.CallTool.Result(
+                    content: [.text("Tool not found: \(params.name)")],
+                    isError: true
+                )
             }
-
-            // Tool not found
-            return MCP.CallTool.Result(
-                content: [.text("Tool not found: \(params.name)")],
-                isError: true
-            )
         }
     }
 
     /// A simple example method
-    public func hello() -> String {
+    public func helloworld() -> String {
         return "Hello iOS Folks! MCP SDK is configured and ready."
+    }
+
+    public func hello(_ name: String) -> String {
+        return "Hello \(name)! MCP SDK is configured and ready."
     }
 }
