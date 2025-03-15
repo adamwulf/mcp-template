@@ -67,17 +67,21 @@ struct RunCommand: AsyncParsableCommand {
         try await mcp.start()
 
         Task {
-            try await Task.sleep(for: .seconds(5))
-            logger.error("registering extra tool")
+            try await Task.sleep(for: .seconds(30))
+            logger.info("registering extra tool")
 
-            // Register a simple tool with no input
-            try await mcp.register(tool: Tool(
-                name: "helloEveryone",
-                description: "Returns a friendly greeting message to everyone around"
-            )) { input in
-                return Result(content: [.text(helloworld())], isError: false)
+            do {
+                // Register a simple tool with no input
+                try await mcp.register(tool: Tool(
+                    name: "helloEveryone",
+                    description: "Returns a friendly greeting message to everyone around"
+                )) { input in
+                    return Result(content: [.text(helloworld())], isError: false)
+                }
+                logger.info("registered extra tool")
+            } catch {
+                logger.error("failed registering extra tool: \(error)")
             }
-            logger.error("registered extra tool")
         }
 
         // Wait until the server is finished processing all input

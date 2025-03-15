@@ -1,13 +1,13 @@
 {
-  "originHash" : "5b2d3edd9b72048e146719d193f7e5fe5227981e52be31e042d4e7eeca23444e",
+  "originHash" : "c50c63362049982dea9f4aa44939df99486e66a53407e0ad635d844f455885bf",
   "pins" : [
     {
       "identity" : "mcp-swift-sdk",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/adamwulf/mcp-swift-sdk",
       "state" : {
-        "branch" : "feature/wait-for-complete",
-        "revision" : "2271710782a6c406774f853eb651fe3c184b1e5f"
+        "branch" : "feature/mcp-template",
+        "revision" : "e693247bbf31369e504edf918049b3a0e7fce624"
       }
     },
     {
@@ -24,8 +24,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-log.git",
       "state" : {
-        "revision" : "96a2f8a0fa41e9e09af4585e2724c4e825410b91",
-        "version" : "1.6.2"
+        "revision" : "3d8596ed08bd13520157f0355e35caed215ffbfa",
+        "version" : "1.6.3"
       }
     },
     {
