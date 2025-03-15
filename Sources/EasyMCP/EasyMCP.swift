@@ -138,12 +138,6 @@ public final class EasyMCP: @unchecked Sendable {
                     isError: true
                 )
             }
-            guard let params = params else {
-                return MCP.CallTool.Result(
-                    content: [.text("Missing parameters")],
-                    isError: true
-                )
-            }
 
             guard let toolMeta = tools[params.name] else {
                 return MCP.CallTool.Result(
