@@ -1,13 +1,13 @@
 {
-  "originHash" : "c50c63362049982dea9f4aa44939df99486e66a53407e0ad635d844f455885bf",
+  "originHash" : "03cddb5e877894c7d7d3035ee37c2110d8460d2e8fefa9ca17b7c4ecead233d3",
   "pins" : [
     {
       "identity" : "mcp-swift-sdk",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/adamwulf/mcp-swift-sdk",
       "state" : {
-        "branch" : "feature/mcp-template",
-        "revision" : "0796377965ada3aa75b18e84cdb7366d4afd6e0b"
+        "branch" : "feature/wait-until-complete",
+        "revision" : "36d81ac795c38287aa36fc894bfd50feca56b2f2"
       }
     },
     {
