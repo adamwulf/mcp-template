@@ -5,9 +5,22 @@ import Foundation
 import MCP
 import Logging
 
+public typealias Tool = MCP.Tool
+public typealias Result = MCP.CallTool.Result
+
 /// Main class for handling MCP (Model Control Protocol) communications
 @available(macOS 14.0, *)
 public final class EasyMCP: @unchecked Sendable {
+
+    enum Error: Swift.Error {
+        case serverHasNotStarted
+    }
+
+    private struct ToolMeta {
+        let tool: MCP.Tool
+        let handler: ([String: Value]) async throws -> Result
+    }
+
     // Internal MCP instance
     private var server: MCP.Server?
     // Transport instance
@@ -17,10 +30,13 @@ public final class EasyMCP: @unchecked Sendable {
     // Flag to track if server is running
     private var isRunning = false
     // Logger instance
-    private let logger = Logger(label: "com.milestonemade.easymcp")
+    private let logger: Logger?
+    // Tools
+    private var tools: [String: ToolMeta] = [:]
 
     /// Initializes a new EasyMCP instance
-    public init() {
+    public init(logger: Logger? = nil) {
+        self.logger = logger
         // Initialize the MCP server with basic capabilities
         server = MCP.Server(
             name: "EasyMCP",
@@ -31,10 +47,12 @@ public final class EasyMCP: @unchecked Sendable {
         )
     }
 
+    // MARK: - Server Lifecycle
+
     /// Start the MCP server with stdio transport
     public func start() async throws {
         guard !isRunning else {
-            logger.logfmt(.info, ["msg": "Server is already running"])
+            logger?.logfmt(.info, ["msg": "Server is already running"])
             return
         }
 
@@ -54,9 +72,9 @@ public final class EasyMCP: @unchecked Sendable {
             do {
                 try await server.start(transport: stdioTransport)
                 isRunning = true
-                logger.logfmt(.info, ["msg": "EasyMCP server started"])
+                logger?.logfmt(.info, ["msg": "EasyMCP server started"])
             } catch {
-                logger.logfmt(.error, ["msg": "Error starting EasyMCP server", "error": "\(error)"])
+                logger?.logfmt(.error, ["msg": "Error starting EasyMCP server", "error": "\(error)"])
                 throw error
             }
         }
@@ -77,37 +95,39 @@ public final class EasyMCP: @unchecked Sendable {
         await server.stop()
         serverTask?.cancel()
         isRunning = false
-        logger.logfmt(.info, ["msg": "EasyMCP server stopped"])
+        logger?.logfmt(.info, ["msg": "EasyMCP server stopped"])
     }
 
-    /// Register MCP tools
+    // MARK: - Tools
+
+    // Register a tool with the server. The server must already be started to register a tool.
+    public func register(tool: Tool, handler: @escaping ([String: Value]) async throws -> Result) async throws {
+        guard let server = server else { return }
+        if tool.inputSchema == nil {
+            let inputSchema: Value = ["type": "object", "properties": [:]]
+            let toolWithSchema = Tool(name: tool.name, description: tool.description, inputSchema: inputSchema)
+            tools[tool.name] = ToolMeta(tool: toolWithSchema, handler: handler)
+        } else {
+            tools[tool.name] = ToolMeta(tool: tool, handler: handler)
+        }
+
+        if isRunning {
+            try await server.notify(ToolListChangedNotification.message())
+        }
+    }
+
+    // MARK: - Private
+
+    /// Register MCP handlers to list and call tools
     private func registerTools() async {
         guard let server = server else { return }
 
         // Register the tools/list handler
-        await server.withMethodHandler(MCP.ListTools.self) { _ in
-            // Define our hello tool
-            let helloWorldTool = MCP.Tool(
-                name: "helloWorld",
-                description: "Returns a friendly greeting message",
-                inputSchema: ["type": "object", "properties": [:]]  // No input parameters needed for this simple example
-            )
-
-            let helloPersonTool = MCP.Tool(
-                name: "helloPerson",
-                description: "Returns a friendly greeting message",
-                inputSchema: [
-                    "type": "object",
-                    "properties": [
-                        "name": [
-                            "type": "string",
-                            "description": "Name to search for (will match given name or family name)",
-                        ]
-                    ]
-                ]
-            )
-
-            return MCP.ListTools.Result(tools: [helloWorldTool, helloPersonTool])
+        await server.withMethodHandler(MCP.ListTools.self) { [weak self] _ in
+            guard let self = self else {
+                return MCP.ListTools.Result(tools: [])
+            }
+            return MCP.ListTools.Result(tools: self.tools.values.map({ $0.tool }))
         }
 
         // Register the tools/call handler
@@ -119,43 +139,14 @@ public final class EasyMCP: @unchecked Sendable {
                 )
             }
 
-            switch params.name {
-            case "helloWorld":
-                let response = self.helloworld()
-                return MCP.CallTool.Result(
-                    content: [.text(response)],
-                    isError: false
-                )
-            case "helloPerson":
-                guard
-                    let args = params.arguments,
-                    let name = args["name"]?.stringValue
-                else {
-                    return MCP.CallTool.Result(
-                        content: [.text("Missing parameter 'name' for tool: \(params.name)")],
-                        isError: true
-                    )
-                }
-                let response = self.hello(name)
-                return MCP.CallTool.Result(
-                    content: [.text(response)],
-                    isError: false
-                )
-            default:
+            guard let toolMeta = tools[params.name] else {
                 return MCP.CallTool.Result(
                     content: [.text("Tool not found: \(params.name)")],
                     isError: true
                 )
             }
+
+            return try await toolMeta.handler(params.arguments ?? [:])
         }
-    }
-
-    /// A simple example method
-    public func helloworld() -> String {
-        return "Hello iOS Folks! MCP SDK is configured and ready."
-    }
-
-    public func hello(_ name: String) -> String {
-        return "Hello \(name)! MCP SDK is configured and ready."
     }
 }

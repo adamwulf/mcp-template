@@ -20,15 +20,8 @@ Current and planned features include:
 - [x] Basic Swift package structure
 - [x] Command line "hello world" example tool
 - [x] Command line stdio for direct MCP interaction via the `run` command
-- [ ] Command line stdio → standalone Mac app via Bonjour for networked MCP communication
+- [ ] App Store safe command line stdio → standalone Mac app communication
 - [ ] SSE server in a Package → example command line app for SSE-based MCP
-
-## Requirements
-
-- Swift 6.0+
-- macOS 15+
-- iOS 17+ (for mobile integration)
-- macCatalyst 17+ (for Catalyst apps)
 
 ## Installation
 
@@ -63,8 +56,26 @@ import EasyMCP
 // Create an instance of EasyMCP
 let mcp = EasyMCP()
 
-// Use the hello example
-print(mcp.hello())
+// Register a tool
+try await mcp.register(tool: Tool(
+    name: "helloPerson",
+    description: "Returns a friendly greeting message",
+    inputSchema: [
+        "type": "object",
+        "properties": [
+            "name": [
+                "type": "string",
+                "description": "Name of the person to say hello to",
+            ]
+        ],
+        "required": ["name"]
+    ]
+)) { input in
+    // It's an async closure, so you can await whatever you need to for long running tasks
+    await someOtherAsyncStuffIfYouWant()
+    // Return your result and flag if it is/not an error
+    return Result(content: [.text(hello(input["name"]?.stringValue ?? "world"))], isError: false)
+}
 
 // Start the MCP server for full MCP interaction
 try await mcp.start()
