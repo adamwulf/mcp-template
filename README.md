@@ -168,7 +168,7 @@ For more debugging tips, visit [MCP Debugging](https://modelcontextprotocol.io/d
 
 ## License
 
-[Insert license information here]
+MIT licensed.
 
 ## Acknowledgments
 
