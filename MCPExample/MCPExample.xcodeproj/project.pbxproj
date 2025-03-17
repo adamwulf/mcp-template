@@ -9,6 +9,8 @@
 /* Begin PBXBuildFile section */
 		C55B13A82D87D10B00E77939 /* mcp-helper in Copy Helper Tools */ = {isa = PBXBuildFile; fileRef = C55B139E2D87D0F100E77939 /* mcp-helper */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		C55B13B62D87D16600E77939 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = C55B13B52D87D16100E77939 /* README.md */; };
+		C5F326F92D87DC25000D77C6 /* ArgumentParser in Frameworks */ = {isa = PBXBuildFile; productRef = C5F326F82D87DC25000D77C6 /* ArgumentParser */; };
+		C5F326FC2D87DC41000D77C6 /* EasyMCP in Frameworks */ = {isa = PBXBuildFile; productRef = C5F326FB2D87DC41000D77C6 /* EasyMCP */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -75,6 +77,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C5F326F92D87DC25000D77C6 /* ArgumentParser in Frameworks */,
+				C5F326FC2D87DC41000D77C6 /* EasyMCP in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -88,6 +92,7 @@
 				C55B139F2D87D0F100E77939 /* mcp-helper */,
 				C55B135C2D87CDAC00E77939 /* Products */,
 				C55B13B52D87D16100E77939 /* README.md */,
+				C5F326FA2D87DC41000D77C6 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -98,6 +103,13 @@
 				C55B139E2D87D0F100E77939 /* mcp-helper */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		C5F326FA2D87DC41000D77C6 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -144,6 +156,8 @@
 			);
 			name = "mcp-helper";
 			packageProductDependencies = (
+				C5F326F82D87DC25000D77C6 /* ArgumentParser */,
+				C5F326FB2D87DC41000D77C6 /* EasyMCP */,
 			);
 			productName = "mcp-helper";
 			productReference = C55B139E2D87D0F100E77939 /* mcp-helper */;
@@ -178,6 +192,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				C55B136D2D87CE7600E77939 /* XCLocalSwiftPackageReference "../../mcp-template" */,
+				C5F326F72D87DC25000D77C6 /* XCRemoteSwiftPackageReference "swift-argument-parser" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = C55B135C2D87CDAC00E77939 /* Products */;
@@ -475,6 +490,30 @@
 			relativePath = "../../mcp-template";
 		};
 /* End XCLocalSwiftPackageReference section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		C5F326F72D87DC25000D77C6 /* XCRemoteSwiftPackageReference "swift-argument-parser" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-argument-parser.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.5.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		C5F326F82D87DC25000D77C6 /* ArgumentParser */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C5F326F72D87DC25000D77C6 /* XCRemoteSwiftPackageReference "swift-argument-parser" */;
+			productName = ArgumentParser;
+		};
+		C5F326FB2D87DC41000D77C6 /* EasyMCP */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C55B136D2D87CE7600E77939 /* XCLocalSwiftPackageReference "../../mcp-template" */;
+			productName = EasyMCP;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = C55B13532D87CDAC00E77939 /* Project object */;
 }
