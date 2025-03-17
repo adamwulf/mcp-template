@@ -6,8 +6,48 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		C55B13A82D87D10B00E77939 /* mcp-helper in Copy Helper Tools */ = {isa = PBXBuildFile; fileRef = C55B139E2D87D0F100E77939 /* mcp-helper */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		C55B13B62D87D16600E77939 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = C55B13B52D87D16100E77939 /* README.md */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		C55B13A52D87D0FE00E77939 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C55B13532D87CDAC00E77939 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C55B139D2D87D0F100E77939;
+			remoteInfo = "mcp-helper";
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		C55B139C2D87D0F100E77939 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = /usr/share/man/man1/;
+			dstSubfolderSpec = 0;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 1;
+		};
+		C55B13A72D87D10200E77939 /* Copy Helper Tools */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 6;
+			files = (
+				C55B13A82D87D10B00E77939 /* mcp-helper in Copy Helper Tools */,
+			);
+			name = "Copy Helper Tools";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		C55B135B2D87CDAC00E77939 /* MCPExample.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MCPExample.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C55B139E2D87D0F100E77939 /* mcp-helper */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "mcp-helper"; sourceTree = BUILT_PRODUCTS_DIR; };
+		C55B13B52D87D16100E77939 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -16,10 +56,22 @@
 			path = MCPExample;
 			sourceTree = "<group>";
 		};
+		C55B139F2D87D0F100E77939 /* mcp-helper */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "mcp-helper";
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		C55B13582D87CDAC00E77939 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C55B139B2D87D0F100E77939 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -33,7 +85,9 @@
 			isa = PBXGroup;
 			children = (
 				C55B135D2D87CDAC00E77939 /* MCPExample */,
+				C55B139F2D87D0F100E77939 /* mcp-helper */,
 				C55B135C2D87CDAC00E77939 /* Products */,
+				C55B13B52D87D16100E77939 /* README.md */,
 			);
 			sourceTree = "<group>";
 		};
@@ -41,6 +95,7 @@
 			isa = PBXGroup;
 			children = (
 				C55B135B2D87CDAC00E77939 /* MCPExample.app */,
+				C55B139E2D87D0F100E77939 /* mcp-helper */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -55,10 +110,12 @@
 				C55B13572D87CDAC00E77939 /* Sources */,
 				C55B13582D87CDAC00E77939 /* Frameworks */,
 				C55B13592D87CDAC00E77939 /* Resources */,
+				C55B13A72D87D10200E77939 /* Copy Helper Tools */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				C55B13A62D87D0FE00E77939 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				C55B135D2D87CDAC00E77939 /* MCPExample */,
@@ -69,6 +126,28 @@
 			productName = MCPExample;
 			productReference = C55B135B2D87CDAC00E77939 /* MCPExample.app */;
 			productType = "com.apple.product-type.application";
+		};
+		C55B139D2D87D0F100E77939 /* mcp-helper */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C55B13A42D87D0F100E77939 /* Build configuration list for PBXNativeTarget "mcp-helper" */;
+			buildPhases = (
+				C55B139A2D87D0F100E77939 /* Sources */,
+				C55B139B2D87D0F100E77939 /* Frameworks */,
+				C55B139C2D87D0F100E77939 /* CopyFiles */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				C55B139F2D87D0F100E77939 /* mcp-helper */,
+			);
+			name = "mcp-helper";
+			packageProductDependencies = (
+			);
+			productName = "mcp-helper";
+			productReference = C55B139E2D87D0F100E77939 /* mcp-helper */;
+			productType = "com.apple.product-type.tool";
 		};
 /* End PBXNativeTarget section */
 
@@ -81,6 +160,9 @@
 				LastUpgradeCheck = 1620;
 				TargetAttributes = {
 					C55B135A2D87CDAC00E77939 = {
+						CreatedOnToolsVersion = 16.2;
+					};
+					C55B139D2D87D0F100E77939 = {
 						CreatedOnToolsVersion = 16.2;
 					};
 				};
@@ -103,6 +185,7 @@
 			projectRoot = "";
 			targets = (
 				C55B135A2D87CDAC00E77939 /* MCPExample */,
+				C55B139D2D87D0F100E77939 /* mcp-helper */,
 			);
 		};
 /* End PBXProject section */
@@ -112,6 +195,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C55B13B62D87D16600E77939 /* README.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -125,7 +209,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		C55B139A2D87D0F100E77939 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		C55B13A62D87D0FE00E77939 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C55B139D2D87D0F100E77939 /* mcp-helper */;
+			targetProxy = C55B13A52D87D0FE00E77939 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		C55B13682D87CDAE00E77939 /* Debug */ = {
@@ -300,6 +399,28 @@
 			};
 			name = Release;
 		};
+		C55B13A22D87D0F100E77939 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = T68Z94627S;
+				ENABLE_HARDENED_RUNTIME = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		C55B13A32D87D0F100E77939 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = T68Z94627S;
+				ENABLE_HARDENED_RUNTIME = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -317,6 +438,15 @@
 			buildConfigurations = (
 				C55B136B2D87CDAE00E77939 /* Debug */,
 				C55B136C2D87CDAE00E77939 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C55B13A42D87D0F100E77939 /* Build configuration list for PBXNativeTarget "mcp-helper" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C55B13A22D87D0F100E77939 /* Debug */,
+				C55B13A32D87D0F100E77939 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
