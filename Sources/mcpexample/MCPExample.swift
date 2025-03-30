@@ -44,33 +44,48 @@ struct RunCommand: AsyncParsableCommand {
         }
         signalSource.resume()
 
-        // Register a simple tool with no input
-        try await mcp.register(tool: Tool(
-            name: "helloWorld",
-            description: "Returns a friendly greeting message"
-        )) { input in
-            return Result(content: [.text(helloworld())], isError: false)
+        do {
+            // Register a simple tool with no input
+            try await mcp.register(tool: Tool(
+                name: "helloWorld",
+                description: "Returns a friendly greeting message"
+            )) { input in
+                return Result(content: [.text(helloworld())], isError: false)
+            }
+        } catch {
+            FileHandle.standardError.write(("error 1: " + String(describing: error)).data(using: .utf8))
+            throw error
         }
 
         // Register a simple tool that accepts a single parameter
-        try await mcp.register(tool: Tool(
-            name: "helloPerson",
-            description: "Returns a friendly greeting message",
-            inputSchema: [
-                "type": "object",
-                "properties": [
-                    "name": [
-                        "type": "string",
-                        "description": "Name to search for (will match given name or family name)",
+        do {
+            try await mcp.register(tool: Tool(
+                name: "helloPerson",
+                description: "Returns a friendly greeting message",
+                inputSchema: [
+                    "type": "object",
+                    "properties": [
+                        "name": [
+                            "type": "string",
+                            "description": "Name to search for (will match given name or family name)",
+                        ]
                     ]
                 ]
-            ]
-        )) { input in
-            return Result(content: [.text(hello(input["name"]?.stringValue ?? "world"))], isError: false)
+            )) { input in
+                return Result(content: [.text(hello(input["name"]?.stringValue ?? "world"))], isError: false)
+            }
+        } catch {
+            FileHandle.standardError.write(("error 1: " + String(describing: error)).data(using: .utf8))
+            throw error
         }
 
-        // Start the server and keep it running
-        try await mcp.start()
+        do {
+            // Start the server and keep it running
+            try await mcp.start()
+        } catch {
+            FileHandle.standardError.write(("error 1: " + String(describing: error)).data(using: .utf8))
+            throw error
+        }
 
         Task {
             try await Task.sleep(for: .seconds(30))
@@ -91,7 +106,12 @@ struct RunCommand: AsyncParsableCommand {
         }
 
         // Wait until the server is finished processing all input
-        try await mcp.waitUntilComplete()
+        do {
+            try await mcp.waitUntilComplete()
+        } catch {
+            FileHandle.standardError.write(("error 1: " + String(describing: error)).data(using: .utf8))
+            throw error
+        }
     }
 
     /// A simple example method

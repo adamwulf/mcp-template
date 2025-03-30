@@ -27,6 +27,8 @@ struct RunCommand: AsyncParsableCommand {
         let logger = Logger(label: "com.milestonemade.easymcp")
         let mcp = EasyMCP(logger: logger)
 
+        try await Task.sleep(for: .seconds(3))
+
         // Set up signal handling to gracefully exit
         let signalSource = DispatchSource.makeSignalSource(signal: SIGINT, queue: .main)
         signal(SIGINT, SIG_IGN)
