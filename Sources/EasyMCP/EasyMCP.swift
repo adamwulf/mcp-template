@@ -82,7 +82,7 @@ public final class EasyMCP: @unchecked Sendable {
 
     public func waitUntilComplete() async throws {
         try await serverTask?.value
-        await server?.waitUntilComplete()
+        await server?.waitUntilCompleted()
     }
 
 
