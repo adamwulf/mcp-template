@@ -1,15 +1,6 @@
 {
-  "originHash" : "03cddb5e877894c7d7d3035ee37c2110d8460d2e8fefa9ca17b7c4ecead233d3",
+  "originHash" : "8d5d1d6cc4fb719069607cf13317e30a4f2d072ee83d9a24326cda7c9d62aa83",
   "pins" : [
-    {
-      "identity" : "mcp-swift-sdk",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/adamwulf/mcp-swift-sdk",
-      "state" : {
-        "branch" : "feature/wait-until-complete",
-        "revision" : "36d81ac795c38287aa36fc894bfd50feca56b2f2"
-      }
-    },
     {
       "identity" : "swift-argument-parser",
       "kind" : "remoteSourceControl",
@@ -26,6 +17,15 @@
       "state" : {
         "revision" : "3d8596ed08bd13520157f0355e35caed215ffbfa",
         "version" : "1.6.3"
+      }
+    },
+    {
+      "identity" : "swift-sdk",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/modelcontextprotocol/swift-sdk",
+      "state" : {
+        "branch" : "main",
+        "revision" : "97b756c0f4f9e81ce7a7cb92fb975e6c28cebf7f"
       }
     },
     {
