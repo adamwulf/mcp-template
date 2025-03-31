@@ -135,6 +135,12 @@ To use this template for your own MCP server:
 4. Modify the EasyMCP implementation to add your custom functionality
 5. Extend the command line example or create your own Mac application
 
+It may also be helpful to use [the MCP Inspector](https://modelcontextprotocol.io/docs/tools/inspector) to diagnose and debug a custom MCP server.
+
+``` bash
+$ npx @modelcontextprotocol/inspector
+```
+
 ## Testing your MCP command line executable
 
 To test and debug your MCP server using the MCP Inspector:
