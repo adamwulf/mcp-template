@@ -27,6 +27,12 @@ struct RunCommand: AsyncParsableCommand {
         let logger = Logger(label: "com.milestonemade.easymcp")
         let mcp = EasyMCP(logger: logger)
 
+        #if DEBUG
+        // when running in debug mode, pause for a bit. This allows for easier "Wait for the executable to be launched" scheme
+        // to debug the mcp starting from Claude or Cursor, etc
+        try await Task.sleep(for: .seconds(3))
+        #endif
+
         // Set up signal handling to gracefully exit
         let signalSource = DispatchSource.makeSignalSource(signal: SIGINT, queue: .main)
         signal(SIGINT, SIG_IGN)

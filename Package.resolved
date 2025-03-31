@@ -1,5 +1,5 @@
 {
-  "originHash" : "8d5d1d6cc4fb719069607cf13317e30a4f2d072ee83d9a24326cda7c9d62aa83",
+  "originHash" : "6bd7367863c93edc70a77034aac5bf36311be4b5b367628ca1e896186bb1ec69",
   "pins" : [
     {
       "identity" : "swift-argument-parser",
@@ -22,10 +22,10 @@
     {
       "identity" : "swift-sdk",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/modelcontextprotocol/swift-sdk",
+      "location" : "https://github.com/adamwulf/swift-sdk",
       "state" : {
-        "branch" : "main",
-        "revision" : "97b756c0f4f9e81ce7a7cb92fb975e6c28cebf7f"
+        "branch" : "fix/decode-tool-call",
+        "revision" : "7ba57396b754d61be85183db6bbd1c51d83bfdf4"
       }
     },
     {
