@@ -42,6 +42,8 @@ public final class EasyMCP: @unchecked Sendable {
             name: "EasyMCP",
             version: "0.1.0",
             capabilities: MCP.Server.Capabilities(
+                prompts: .init(listChanged: false),
+                resources: .init(subscribe: false, listChanged: false),
                 tools: .init(listChanged: true)
             )
         )
@@ -147,5 +149,20 @@ public final class EasyMCP: @unchecked Sendable {
 
             return try await toolMeta.handler(params.arguments ?? [:])
         }
+
+        await server.withMethodHandler(MCP.ListPrompts.self) { [weak self] _ in
+            guard let self = self else {
+                return ListPrompts.Result(prompts: [])
+            }
+            return ListPrompts.Result(prompts: [])
+        }
+
+        await server.withMethodHandler(MCP.ListResources.self) { [weak self] _ in
+            guard let self = self else {
+                return ListResources.Result(resources: [])
+            }
+            return ListResources.Result(resources: [])
+        }
+
     }
 }
