@@ -33,12 +33,8 @@ class WritePipe {
         // Check if the pipe already exists
         let fileManager = FileManager.default
         if fileManager.fileExists(atPath: pipePath) {
-            do {
-                try fileManager.removeItem(atPath: pipePath)
-            } catch {
-                print("Error removing existing pipe: \(error.localizedDescription)")
-                return false
-            }
+            // Pipe already exists, so just use it
+            return true
         }
         
         // Create the pipe with read/write permissions for user, group, and others
