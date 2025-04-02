@@ -15,6 +15,7 @@ class ReadPipe {
         }
         
         self.fileURL = url
+        Logging.printInfo("ReadPipe init with path: \(url.path)")
         
         // Create the pipe
         if !createPipe() {
@@ -32,18 +33,21 @@ class ReadPipe {
         let pipePath = fileURL.path
         let fileManager = FileManager.default
         
+        Logging.printInfo("Creating pipe at path: \(pipePath)")
+        
         // Check if the path already exists
         if fileManager.fileExists(atPath: pipePath) {
-            // Check if it's a pipe
+            // Check if it's a pipe using FileManager extension
             if fileManager.isPipe(at: fileURL) {
-                // It's a pipe, so just use it
+                Logging.printInfo("Pipe already exists at \(pipePath)")
                 return true
             } else {
-                // It exists but is not a pipe, try to remove it
+                Logging.printInfo("File exists but is not a pipe, attempting to remove: \(pipePath)")
                 do {
                     try fileManager.removeItem(atPath: pipePath)
+                    Logging.printInfo("Successfully removed existing file at \(pipePath)")
                 } catch {
-                    Logging.printError("Error removing existing file", error: error)
+                    Logging.printError("Error removing existing file at \(pipePath)", error: error)
                     return false
                 }
             }
@@ -51,12 +55,28 @@ class ReadPipe {
         
         // Create the pipe with read/write permissions for user, group, and others
         // 0o666 = rw-rw-rw-
+        Logging.printInfo("Creating named pipe with mkfifo at \(pipePath)")
         let result = mkfifo(pipePath, 0o666)
         
         if result != 0 {
             let errorString = String(cString: strerror(errno))
-            Logging.printError("Error creating pipe at \(pipePath): \(errorString)")
+            Logging.printError("Error creating pipe at \(pipePath): \(errorString) (errno: \(errno))")
             return false
+        }
+        
+        Logging.printInfo("Successfully created pipe at \(pipePath)")
+        
+        // Check permissions on the created pipe
+        if let attributes = try? fileManager.attributesOfItem(atPath: pipePath),
+           let posixPermissions = attributes[.posixPermissions] as? NSNumber {
+            Logging.printInfo("Pipe permissions: \(String(format: "%o", posixPermissions.intValue))")
+        }
+        
+        // Verify it's actually a pipe
+        if fileManager.isPipe(at: fileURL) {
+            Logging.printInfo("Verified that the created file is a pipe")
+        } else {
+            Logging.printError("Created file is not detected as a pipe, this may cause issues")
         }
         
         return true
@@ -65,13 +85,29 @@ class ReadPipe {
     /// Opens the pipe for reading without blocking on open, but allowing blocking reads
     /// - Returns: Boolean indicating success
     func open() -> Bool {
-        // First open with O_NONBLOCK flag to prevent blocking on open
-        let fileDescriptor = Darwin.open(fileURL.path, O_RDONLY | O_NONBLOCK, 0)
-        guard fileDescriptor != -1 else {
-            let errorString = String(cString: strerror(errno))
-            Logging.printError("Error opening pipe: \(errorString)")
+        Logging.printInfo("Opening pipe for reading: \(fileURL.path)")
+        
+        // Make sure the path exists and is a pipe
+        let pipePath = fileURL.path
+        guard FileManager.default.fileExists(atPath: pipePath) else {
+            Logging.printError("Pipe does not exist at path: \(pipePath)")
             return false
         }
+        
+        guard FileManager.default.isPipe(at: fileURL) else {
+            Logging.printError("File at \(pipePath) is not a pipe")
+            return false
+        }
+        
+        // First open with O_NONBLOCK flag to prevent blocking on open
+        let fileDescriptor = Darwin.open(pipePath, O_RDONLY | O_NONBLOCK, 0)
+        guard fileDescriptor != -1 else {
+            let errorString = String(cString: strerror(errno))
+            Logging.printError("Error opening pipe for reading: \(errorString) (errno: \(errno))")
+            return false
+        }
+
+        Logging.printInfo("Successfully opened pipe for reading with file descriptor: \(fileDescriptor)")
 
         // Get flags
         let flags = fcntl(fileDescriptor, F_GETFL)
@@ -88,10 +124,14 @@ class ReadPipe {
             let errorString = String(cString: strerror(errno))
             Logging.printError("Error setting file descriptor flags: \(errorString)")
             // Continue since we can still use the file descriptor
+        } else {
+            Logging.printInfo("Successfully set file descriptor to blocking mode")
         }
 
         // Create file handle
         fileHandle = FileHandle(fileDescriptor: fileDescriptor, closeOnDealloc: true)
+        Logging.printInfo("Created FileHandle for reading")
+        
         return true
     }
     
@@ -103,9 +143,15 @@ class ReadPipe {
             return nil
         }
         
+        Logging.printInfo("Reading from pipe (blocking)...")
         do {
             // This will block until data is available
             let data = try fileHandle.readToEnd()
+            if let data = data {
+                Logging.printInfo("Successfully read \(data.count) bytes from pipe")
+            } else {
+                Logging.printInfo("Read returned nil data (EOF)")
+            }
             return data
         } catch {
             Logging.printError("Error reading from pipe", error: error)
@@ -120,11 +166,18 @@ class ReadPipe {
             return nil
         }
         
-        return String(data: data, encoding: .utf8)
+        if let string = String(data: data, encoding: .utf8) {
+            Logging.printInfo("Successfully converted data to string: \(string)")
+            return string
+        } else {
+            Logging.printError("Failed to convert data to string")
+            return nil
+        }
     }
     
     /// Closes the pipe
     func close() {
+        Logging.printInfo("Closing read pipe")
         try? fileHandle?.close()
         fileHandle = nil
     }

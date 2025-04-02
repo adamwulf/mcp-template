@@ -94,9 +94,17 @@ final class PipeReader: ObservableObject, Sendable {
     
     func testWriteToPipe() {
         Task {
+            writeStatus = "Checking pipe status..."
+            
+            // Print pipe status before attempting to write
+            PipeTestHelpers.printPipeStatus()
+            
             writeStatus = "Writing to pipe..."
             let success = await PipeTestHelpers.testWritePipeAsync(message: "Test message from MCPExampleApp!")
             writeStatus = success ? "Write successful!" : "Write failed!"
+            
+            // Print pipe status after writing
+            PipeTestHelpers.printPipeStatus()
             
             // Clear status after a delay
             try? await Task.sleep(for: .seconds(2))
