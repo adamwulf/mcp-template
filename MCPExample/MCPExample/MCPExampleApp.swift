@@ -35,6 +35,7 @@ struct MCPExampleApp: App {
 final class PipeReader: ObservableObject, Sendable {
     @Published var messages: [String] = []
     @Published var isReading: Bool = false
+    @Published var writeStatus: String = ""
     
     private var pipeReadTask: Task<Void, Never>?
     
@@ -89,5 +90,17 @@ final class PipeReader: ObservableObject, Sendable {
         isReading = false
         pipeReadTask?.cancel()
         pipeReadTask = nil
+    }
+    
+    func testWriteToPipe() {
+        Task {
+            writeStatus = "Writing to pipe..."
+            let success = await PipeTestHelpers.testWritePipeAsync(message: "Test message from MCPExampleApp!")
+            writeStatus = success ? "Write successful!" : "Write failed!"
+            
+            // Clear status after a delay
+            try? await Task.sleep(for: .seconds(2))
+            writeStatus = ""
+        }
     }
 }

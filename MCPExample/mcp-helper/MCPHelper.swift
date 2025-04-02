@@ -29,39 +29,13 @@ struct RunCommand: AsyncParsableCommand {
 
         try await Task.sleep(for: .seconds(3))
         
-        // Pipe test code
+        // Use the new PipeTestHelpers to test pipe functionality
         Task {
-            logger.info("Starting pipe test...")
-            
-            // Get the path to the pipe
-            let pipePath = PipeConstants.testPipePath()
-            logger.info("Creating write pipe at: \(pipePath.path)")
-            
-            // Create a write pipe
-            guard let writePipe = WritePipe(url: pipePath) else {
-                logger.error("Failed to create write pipe")
-                return
-            }
-            
-            // Open the pipe for writing
-            guard writePipe.open() else {
-                logger.error("Failed to open write pipe")
-                return
-            }
-            
-            // Write to the pipe
-            let message = "Hello World from mcp-helper!"
-            logger.info("Writing message: \(message)")
-            
-            if writePipe.write(message) {
-                logger.info("Message written successfully")
-            } else {
-                logger.error("Failed to write message")
-            }
-            
-            // Close the pipe
-            writePipe.close()
-            logger.info("Pipe test completed")
+            logger.info("Starting pipe test using PipeTestHelpers...")
+            let success = await PipeTestHelpers.testWritePipeAsync(
+                message: "Hello World from mcp-helper through PipeTestHelpers!"
+            )
+            logger.info("Pipe test result: \(success ? "successful" : "failed")")
         }
 
         // Set up signal handling to gracefully exit

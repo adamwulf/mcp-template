@@ -19,6 +19,8 @@
 		C57BC9CA2D9DD6D100D817AD /* Logging.swift in Sources */ = {isa = PBXBuildFile; fileRef = C57BC9C62D9DD6D100D817AD /* Logging.swift */; };
 		C57BC9CC2D9DD7B800D817AD /* PipeConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = C57BC9CB2D9DD7B800D817AD /* PipeConstants.swift */; };
 		C57BC9CD2D9DD7B800D817AD /* PipeConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = C57BC9CB2D9DD7B800D817AD /* PipeConstants.swift */; };
+		C57BC9CF2D9DDE8900D817AD /* PipeTestHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = C57BC9CE2D9DDE8900D817AD /* PipeTestHelpers.swift */; };
+		C57BC9D02D9DDE8900D817AD /* PipeTestHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = C57BC9CE2D9DDE8900D817AD /* PipeTestHelpers.swift */; };
 		C5F326F92D87DC25000D77C6 /* ArgumentParser in Frameworks */ = {isa = PBXBuildFile; productRef = C5F326F82D87DC25000D77C6 /* ArgumentParser */; };
 		C5F326FC2D87DC41000D77C6 /* EasyMCP in Frameworks */ = {isa = PBXBuildFile; productRef = C5F326FB2D87DC41000D77C6 /* EasyMCP */; };
 /* End PBXBuildFile section */
@@ -65,6 +67,7 @@
 		C57BC9C52D9DD6D100D817AD /* FileManager+Pipe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FileManager+Pipe.swift"; sourceTree = "<group>"; };
 		C57BC9C62D9DD6D100D817AD /* Logging.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Logging.swift; sourceTree = "<group>"; };
 		C57BC9CB2D9DD7B800D817AD /* PipeConstants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipeConstants.swift; sourceTree = "<group>"; };
+		C57BC9CE2D9DDE8900D817AD /* PipeTestHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipeTestHelpers.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -124,6 +127,7 @@
 		C57BC9BE2D9DD3B100D817AD /* Shared */ = {
 			isa = PBXGroup;
 			children = (
+				C57BC9CE2D9DDE8900D817AD /* PipeTestHelpers.swift */,
 				C57BC9CB2D9DD7B800D817AD /* PipeConstants.swift */,
 				C57BC9C52D9DD6D100D817AD /* FileManager+Pipe.swift */,
 				C57BC9C62D9DD6D100D817AD /* Logging.swift */,
@@ -249,6 +253,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C57BC9D02D9DDE8900D817AD /* PipeTestHelpers.swift in Sources */,
 				C57BC9C32D9DD54600D817AD /* ReadPipe.swift in Sources */,
 				C57BC9C72D9DD6D100D817AD /* FileManager+Pipe.swift in Sources */,
 				C57BC9C82D9DD6D100D817AD /* Logging.swift in Sources */,
@@ -262,6 +267,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				C57BC9C92D9DD6D100D817AD /* FileManager+Pipe.swift in Sources */,
+				C57BC9CF2D9DDE8900D817AD /* PipeTestHelpers.swift in Sources */,
 				C57BC9CA2D9DD6D100D817AD /* Logging.swift in Sources */,
 				C57BC9C12D9DD54600D817AD /* ReadPipe.swift in Sources */,
 				C57BC9CD2D9DD7B800D817AD /* PipeConstants.swift in Sources */,
