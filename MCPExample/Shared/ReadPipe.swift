@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 /// A class for creating and reading from a named pipe (FIFO)
 class ReadPipe {
@@ -61,19 +62,40 @@ class ReadPipe {
         return true
     }
     
-    /// Opens the pipe for reading
+    /// Opens the pipe for reading without blocking on open, but allowing blocking reads
     /// - Returns: Boolean indicating success
     func open() -> Bool {
-        do {
-            fileHandle = try FileHandle(forReadingFrom: fileURL)
-            return true
-        } catch {
-            Logging.printError("Error opening pipe for reading", error: error)
+        // First open with O_NONBLOCK flag to prevent blocking on open
+        let fileDescriptor = Darwin.open(fileURL.path, O_RDONLY | O_NONBLOCK, 0)
+        guard fileDescriptor != -1 else {
+            let errorString = String(cString: strerror(errno))
+            Logging.printError("Error opening pipe: \(errorString)")
             return false
         }
+
+        // Get flags
+        let flags = fcntl(fileDescriptor, F_GETFL)
+        guard flags != -1 else {
+            let errorString = String(cString: strerror(errno))
+            Logging.printError("Error getting file descriptor flags: \(errorString)")
+            Darwin.close(fileDescriptor)  // Close the FD to prevent leaks
+            return false
+        }
+
+        // Set flags - check for error
+        let result = fcntl(fileDescriptor, F_SETFL, flags & ~O_NONBLOCK)
+        if result == -1 {
+            let errorString = String(cString: strerror(errno))
+            Logging.printError("Error setting file descriptor flags: \(errorString)")
+            // Continue since we can still use the file descriptor
+        }
+
+        // Create file handle
+        fileHandle = FileHandle(fileDescriptor: fileDescriptor, closeOnDealloc: true)
+        return true
     }
     
-    /// Reads data from the pipe
+    /// Reads data from the pipe (blocking)
     /// - Returns: Data read from the pipe, or nil if there was an error
     func read() -> Data? {
         guard let fileHandle = fileHandle else {
