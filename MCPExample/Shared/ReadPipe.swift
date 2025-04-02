@@ -86,6 +86,7 @@ class ReadPipe {
     /// - Returns: Boolean indicating success
     func open() -> Bool {
         Logging.printInfo("Opening pipe for reading: \(fileURL.path)")
+        Logging.printInfo("Current process: \(ProcessInfo.processInfo.processName), PID: \(ProcessInfo.processInfo.processIdentifier)")
         
         // Make sure the path exists and is a pipe
         let pipePath = fileURL.path
@@ -99,11 +100,37 @@ class ReadPipe {
             return false
         }
         
+        // Check directory permissions
+        let dirPath = fileURL.deletingLastPathComponent().path
+        if let attributes = try? FileManager.default.attributesOfItem(atPath: dirPath) {
+            if let permissions = attributes[.posixPermissions] as? NSNumber {
+                Logging.printInfo("Directory permissions: \(String(format: "%o", permissions.intValue))")
+            }
+            if let owner = attributes[.ownerAccountName] as? String {
+                Logging.printInfo("Directory owner: \(owner)")
+            }
+        }
+        
+        // Check pipe permissions
+        if let attributes = try? FileManager.default.attributesOfItem(atPath: pipePath) {
+            if let permissions = attributes[.posixPermissions] as? NSNumber {
+                Logging.printInfo("Pipe permissions: \(String(format: "%o", permissions.intValue))")
+            }
+            if let owner = attributes[.ownerAccountName] as? String {
+                Logging.printInfo("Pipe owner: \(owner)")
+            }
+        }
+        
         // First open with O_NONBLOCK flag to prevent blocking on open
         let fileDescriptor = Darwin.open(pipePath, O_RDONLY | O_NONBLOCK, 0)
         guard fileDescriptor != -1 else {
             let errorString = String(cString: strerror(errno))
             Logging.printError("Error opening pipe for reading: \(errorString) (errno: \(errno))")
+            
+            // More detailed error diagnostics
+            Logging.printInfo("Checking pipe status...")
+            PipeTestHelpers.printPipeStatus(pipePath: fileURL)
+            
             return false
         }
 

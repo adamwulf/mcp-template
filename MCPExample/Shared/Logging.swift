@@ -29,7 +29,7 @@ public enum Logging {
     /// - Parameter message: The info message to print
     public static func printInfo(_ message: String) {
         if let data = (message + "\n").data(using: .utf8) {
-            FileHandle.standardOutput.write(data)
+            FileHandle.standardError.write(data)
         }
     }
 } 
