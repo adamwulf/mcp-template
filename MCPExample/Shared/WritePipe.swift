@@ -9,7 +9,7 @@ class WritePipe {
     /// - Parameter url: A file URL where the pipe should be created
     init?(url: URL) {
         guard url.isFileURL else {
-            fatalError("Error: URL must be a file URL")
+            Logging.printError("Error: URL must be a file URL")
             return nil
         }
         
@@ -29,12 +29,23 @@ class WritePipe {
     /// - Returns: Boolean indicating success
     private func createPipe() -> Bool {
         let pipePath = fileURL.path
-        
-        // Check if the pipe already exists
         let fileManager = FileManager.default
+        
+        // Check if the path already exists
         if fileManager.fileExists(atPath: pipePath) {
-            // Pipe already exists, so just use it
-            return true
+            // Check if it's a pipe
+            if fileManager.isPipe(at: fileURL) {
+                // It's a pipe, so just use it
+                return true
+            } else {
+                // It exists but is not a pipe, try to remove it
+                do {
+                    try fileManager.removeItem(atPath: pipePath)
+                } catch {
+                    Logging.printError("Error removing existing file", error: error)
+                    return false
+                }
+            }
         }
         
         // Create the pipe with read/write permissions for user, group, and others
@@ -43,7 +54,7 @@ class WritePipe {
         
         if result != 0 {
             let errorString = String(cString: strerror(errno))
-            print("Error creating pipe at \(pipePath): \(errorString)")
+            Logging.printError("Error creating pipe at \(pipePath): \(errorString)")
             return false
         }
         
@@ -57,7 +68,7 @@ class WritePipe {
             fileHandle = try FileHandle(forWritingTo: fileURL)
             return true
         } catch {
-            print("Error opening pipe for writing: \(error.localizedDescription)")
+            Logging.printError("Error opening pipe for writing", error: error)
             return false
         }
     }
@@ -67,7 +78,7 @@ class WritePipe {
     /// - Returns: Boolean indicating success
     func write(_ data: Data) -> Bool {
         guard let fileHandle = fileHandle else {
-            print("Error: Pipe not opened")
+            Logging.printError("Error: Pipe not opened")
             return false
         }
         
@@ -75,7 +86,7 @@ class WritePipe {
             try fileHandle.write(contentsOf: data)
             return true
         } catch {
-            print("Error writing to pipe: \(error.localizedDescription)")
+            Logging.printError("Error writing to pipe", error: error)
             return false
         }
     }
@@ -85,7 +96,7 @@ class WritePipe {
     /// - Returns: Boolean indicating success
     func write(_ string: String) -> Bool {
         guard let data = string.data(using: .utf8) else {
-            print("Error converting string to data")
+            Logging.printError("Error converting string to data")
             return false
         }
         

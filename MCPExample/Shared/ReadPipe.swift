@@ -9,7 +9,7 @@ class ReadPipe {
     /// - Parameter url: A file URL where the pipe should be created
     init?(url: URL) {
         guard url.isFileURL else {
-            fatalError("Error: URL must be a file URL")
+            Logging.printError("Error: URL must be a file URL")
             return nil
         }
         
@@ -29,12 +29,23 @@ class ReadPipe {
     /// - Returns: Boolean indicating success
     private func createPipe() -> Bool {
         let pipePath = fileURL.path
-        
-        // Check if the pipe already exists
         let fileManager = FileManager.default
+        
+        // Check if the path already exists
         if fileManager.fileExists(atPath: pipePath) {
-            // Pipe already exists, so just use it
-            return true
+            // Check if it's a pipe
+            if fileManager.isPipe(at: fileURL) {
+                // It's a pipe, so just use it
+                return true
+            } else {
+                // It exists but is not a pipe, try to remove it
+                do {
+                    try fileManager.removeItem(atPath: pipePath)
+                } catch {
+                    Logging.printError("Error removing existing file", error: error)
+                    return false
+                }
+            }
         }
         
         // Create the pipe with read/write permissions for user, group, and others
@@ -43,7 +54,7 @@ class ReadPipe {
         
         if result != 0 {
             let errorString = String(cString: strerror(errno))
-            print("Error creating pipe at \(pipePath): \(errorString)")
+            Logging.printError("Error creating pipe at \(pipePath): \(errorString)")
             return false
         }
         
@@ -57,7 +68,7 @@ class ReadPipe {
             fileHandle = try FileHandle(forReadingFrom: fileURL)
             return true
         } catch {
-            print("Error opening pipe for reading: \(error.localizedDescription)")
+            Logging.printError("Error opening pipe for reading", error: error)
             return false
         }
     }
@@ -66,7 +77,7 @@ class ReadPipe {
     /// - Returns: Data read from the pipe, or nil if there was an error
     func read() -> Data? {
         guard let fileHandle = fileHandle else {
-            print("Error: Pipe not opened")
+            Logging.printError("Error: Pipe not opened")
             return nil
         }
         
@@ -75,7 +86,7 @@ class ReadPipe {
             let data = try fileHandle.readToEnd()
             return data
         } catch {
-            print("Error reading from pipe: \(error.localizedDescription)")
+            Logging.printError("Error reading from pipe", error: error)
             return nil
         }
     }

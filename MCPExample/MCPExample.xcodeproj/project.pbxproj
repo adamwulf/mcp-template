@@ -13,6 +13,10 @@
 		C57BC9C22D9DD54600D817AD /* WritePipe.swift in Sources */ = {isa = PBXBuildFile; fileRef = C57BC9C02D9DD54600D817AD /* WritePipe.swift */; };
 		C57BC9C32D9DD54600D817AD /* ReadPipe.swift in Sources */ = {isa = PBXBuildFile; fileRef = C57BC9BF2D9DD54600D817AD /* ReadPipe.swift */; };
 		C57BC9C42D9DD54600D817AD /* WritePipe.swift in Sources */ = {isa = PBXBuildFile; fileRef = C57BC9C02D9DD54600D817AD /* WritePipe.swift */; };
+		C57BC9C72D9DD6D100D817AD /* FileManager+Pipe.swift in Sources */ = {isa = PBXBuildFile; fileRef = C57BC9C52D9DD6D100D817AD /* FileManager+Pipe.swift */; };
+		C57BC9C82D9DD6D100D817AD /* Logging.swift in Sources */ = {isa = PBXBuildFile; fileRef = C57BC9C62D9DD6D100D817AD /* Logging.swift */; };
+		C57BC9C92D9DD6D100D817AD /* FileManager+Pipe.swift in Sources */ = {isa = PBXBuildFile; fileRef = C57BC9C52D9DD6D100D817AD /* FileManager+Pipe.swift */; };
+		C57BC9CA2D9DD6D100D817AD /* Logging.swift in Sources */ = {isa = PBXBuildFile; fileRef = C57BC9C62D9DD6D100D817AD /* Logging.swift */; };
 		C5F326F92D87DC25000D77C6 /* ArgumentParser in Frameworks */ = {isa = PBXBuildFile; productRef = C5F326F82D87DC25000D77C6 /* ArgumentParser */; };
 		C5F326FC2D87DC41000D77C6 /* EasyMCP in Frameworks */ = {isa = PBXBuildFile; productRef = C5F326FB2D87DC41000D77C6 /* EasyMCP */; };
 /* End PBXBuildFile section */
@@ -56,6 +60,8 @@
 		C55B13B52D87D16100E77939 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		C57BC9BF2D9DD54600D817AD /* ReadPipe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadPipe.swift; sourceTree = "<group>"; };
 		C57BC9C02D9DD54600D817AD /* WritePipe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WritePipe.swift; sourceTree = "<group>"; };
+		C57BC9C52D9DD6D100D817AD /* FileManager+Pipe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FileManager+Pipe.swift"; sourceTree = "<group>"; };
+		C57BC9C62D9DD6D100D817AD /* Logging.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Logging.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -115,6 +121,8 @@
 		C57BC9BE2D9DD3B100D817AD /* Shared */ = {
 			isa = PBXGroup;
 			children = (
+				C57BC9C52D9DD6D100D817AD /* FileManager+Pipe.swift */,
+				C57BC9C62D9DD6D100D817AD /* Logging.swift */,
 				C57BC9BF2D9DD54600D817AD /* ReadPipe.swift */,
 				C57BC9C02D9DD54600D817AD /* WritePipe.swift */,
 			);
@@ -238,6 +246,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				C57BC9C32D9DD54600D817AD /* ReadPipe.swift in Sources */,
+				C57BC9C72D9DD6D100D817AD /* FileManager+Pipe.swift in Sources */,
+				C57BC9C82D9DD6D100D817AD /* Logging.swift in Sources */,
 				C57BC9C42D9DD54600D817AD /* WritePipe.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -246,6 +256,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C57BC9C92D9DD6D100D817AD /* FileManager+Pipe.swift in Sources */,
+				C57BC9CA2D9DD6D100D817AD /* Logging.swift in Sources */,
 				C57BC9C12D9DD54600D817AD /* ReadPipe.swift in Sources */,
 				C57BC9C22D9DD54600D817AD /* WritePipe.swift in Sources */,
 			);
