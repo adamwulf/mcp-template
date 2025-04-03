@@ -80,6 +80,11 @@
 			path = "mcp-helper";
 			sourceTree = "<group>";
 		};
+		C57BC9E02D9E417B00D817AD /* xcconfig */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = xcconfig;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -105,11 +110,12 @@
 		C55B13522D87CDAC00E77939 = {
 			isa = PBXGroup;
 			children = (
+				C55B13B52D87D16100E77939 /* README.md */,
 				C57BC9BE2D9DD3B100D817AD /* Shared */,
 				C55B135D2D87CDAC00E77939 /* MCPExample */,
 				C55B139F2D87D0F100E77939 /* mcp-helper */,
 				C55B135C2D87CDAC00E77939 /* Products */,
-				C55B13B52D87D16100E77939 /* README.md */,
+				C57BC9E02D9E417B00D817AD /* xcconfig */,
 				C5F326FA2D87DC41000D77C6 /* Frameworks */,
 			);
 			sourceTree = "<group>";
@@ -163,6 +169,7 @@
 			);
 			fileSystemSynchronizedGroups = (
 				C55B135D2D87CDAC00E77939 /* MCPExample */,
+				C57BC9E02D9E417B00D817AD /* xcconfig */,
 			);
 			name = MCPExample;
 			packageProductDependencies = (
@@ -257,12 +264,12 @@
 			inputFileListPaths = (
 			);
 			inputPaths = (
-				"$(SRCROOT)/MCPExample/xcconfig/MCPExample-Debug.xcconfig",
-				"$(SRCROOT)/MCPExample/xcconfig/MCPExample-Release.xcconfig",
-				"$(SRCROOT)/MCPExample/xcconfig/MCPExample-Shared.xcconfig",
-				"$(SRCROOT)/MCPExample/xcconfig/Project-Debug.xcconfig",
-				"$(SRCROOT)/MCPExample/xcconfig/Project-Release.xcconfig",
-				"$(SRCROOT)/MCPExample/xcconfig/Project-Shared.xcconfig",
+				"$(SRCROOT)/xcconfig/MCPExample-Debug.xcconfig",
+				"$(SRCROOT)/xcconfig/MCPExample-Release.xcconfig",
+				"$(SRCROOT)/xcconfig/MCPExample-Shared.xcconfig",
+				"$(SRCROOT)/xcconfig/Project-Debug.xcconfig",
+				"$(SRCROOT)/xcconfig/Project-Release.xcconfig",
+				"$(SRCROOT)/xcconfig/Project-Shared.xcconfig",
 			);
 			name = "Generate BuildSettings";
 			outputFileListPaths = (
@@ -282,12 +289,12 @@
 			inputFileListPaths = (
 			);
 			inputPaths = (
-				"$(SRCROOT)/MCPExample/xcconfig/mcp-helper-Debug.xcconfig",
-				"$(SRCROOT)/MCPExample/xcconfig/mcp-helper-Release.xcconfig",
-				"$(SRCROOT)/MCPExample/xcconfig/mcp-helper-Shared.xcconfig",
-				"$(SRCROOT)/MCPExample/xcconfig/Project-Debug.xcconfig",
-				"$(SRCROOT)/MCPExample/xcconfig/Project-Release.xcconfig",
-				"$(SRCROOT)/MCPExample/xcconfig/Project-Shared.xcconfig",
+				"$(SRCROOT)/xcconfig/mcp-helper-Debug.xcconfig",
+				"$(SRCROOT)/xcconfig/mcp-helper-Release.xcconfig",
+				"$(SRCROOT)/xcconfig/mcp-helper-Shared.xcconfig",
+				"$(SRCROOT)/xcconfig/Project-Debug.xcconfig",
+				"$(SRCROOT)/xcconfig/Project-Release.xcconfig",
+				"$(SRCROOT)/xcconfig/Project-Shared.xcconfig",
 			);
 			name = "Generate BuildSettings";
 			outputFileListPaths = (
@@ -341,48 +348,48 @@
 /* Begin XCBuildConfiguration section */
 		C55B13682D87CDAE00E77939 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReferenceAnchor = C55B135D2D87CDAC00E77939 /* MCPExample */;
-			baseConfigurationReferenceRelativePath = "xcconfig/Project-Debug.xcconfig";
+			baseConfigurationReferenceAnchor = C57BC9E02D9E417B00D817AD /* xcconfig */;
+			baseConfigurationReferenceRelativePath = "Project-Debug.xcconfig";
 			buildSettings = {
 			};
 			name = Debug;
 		};
 		C55B13692D87CDAE00E77939 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReferenceAnchor = C55B135D2D87CDAC00E77939 /* MCPExample */;
-			baseConfigurationReferenceRelativePath = "xcconfig/Project-Release.xcconfig";
+			baseConfigurationReferenceAnchor = C57BC9E02D9E417B00D817AD /* xcconfig */;
+			baseConfigurationReferenceRelativePath = "Project-Release.xcconfig";
 			buildSettings = {
 			};
 			name = Release;
 		};
 		C55B136B2D87CDAE00E77939 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReferenceAnchor = C55B135D2D87CDAC00E77939 /* MCPExample */;
-			baseConfigurationReferenceRelativePath = "xcconfig/MCPExample-Debug.xcconfig";
+			baseConfigurationReferenceAnchor = C57BC9E02D9E417B00D817AD /* xcconfig */;
+			baseConfigurationReferenceRelativePath = "MCPExample-Debug.xcconfig";
 			buildSettings = {
 			};
 			name = Debug;
 		};
 		C55B136C2D87CDAE00E77939 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReferenceAnchor = C55B135D2D87CDAC00E77939 /* MCPExample */;
-			baseConfigurationReferenceRelativePath = "xcconfig/MCPExample-Release.xcconfig";
+			baseConfigurationReferenceAnchor = C57BC9E02D9E417B00D817AD /* xcconfig */;
+			baseConfigurationReferenceRelativePath = "MCPExample-Release.xcconfig";
 			buildSettings = {
 			};
 			name = Release;
 		};
 		C55B13A22D87D0F100E77939 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReferenceAnchor = C55B135D2D87CDAC00E77939 /* MCPExample */;
-			baseConfigurationReferenceRelativePath = "xcconfig/mcp-helper-Debug.xcconfig";
+			baseConfigurationReferenceAnchor = C57BC9E02D9E417B00D817AD /* xcconfig */;
+			baseConfigurationReferenceRelativePath = "mcp-helper-Debug.xcconfig";
 			buildSettings = {
 			};
 			name = Debug;
 		};
 		C55B13A32D87D0F100E77939 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReferenceAnchor = C55B135D2D87CDAC00E77939 /* MCPExample */;
-			baseConfigurationReferenceRelativePath = "xcconfig/mcp-helper-Release.xcconfig";
+			baseConfigurationReferenceAnchor = C57BC9E02D9E417B00D817AD /* xcconfig */;
+			baseConfigurationReferenceRelativePath = "mcp-helper-Release.xcconfig";
 			buildSettings = {
 			};
 			name = Release;
