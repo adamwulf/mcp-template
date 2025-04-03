@@ -8,7 +8,6 @@
 
 /* Begin PBXBuildFile section */
 		C55B13A82D87D10B00E77939 /* mcp-helper in Copy Helper Tools */ = {isa = PBXBuildFile; fileRef = C55B139E2D87D0F100E77939 /* mcp-helper */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
-		C55B13B62D87D16600E77939 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = C55B13B52D87D16100E77939 /* README.md */; };
 		C57BC9C12D9DD54600D817AD /* ReadPipe.swift in Sources */ = {isa = PBXBuildFile; fileRef = C57BC9BF2D9DD54600D817AD /* ReadPipe.swift */; };
 		C57BC9C22D9DD54600D817AD /* WritePipe.swift in Sources */ = {isa = PBXBuildFile; fileRef = C57BC9C02D9DD54600D817AD /* WritePipe.swift */; };
 		C57BC9C32D9DD54600D817AD /* ReadPipe.swift in Sources */ = {isa = PBXBuildFile; fileRef = C57BC9BF2D9DD54600D817AD /* ReadPipe.swift */; };
@@ -151,6 +150,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = C55B136A2D87CDAE00E77939 /* Build configuration list for PBXNativeTarget "MCPExample" */;
 			buildPhases = (
+				C57BC9D12D9E3F9400D817AD /* Generate BuildSettings */,
 				C55B13572D87CDAC00E77939 /* Sources */,
 				C55B13582D87CDAC00E77939 /* Frameworks */,
 				C55B13592D87CDAC00E77939 /* Resources */,
@@ -175,6 +175,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = C55B13A42D87D0F100E77939 /* Build configuration list for PBXNativeTarget "mcp-helper" */;
 			buildPhases = (
+				C57BC9D22D9E3FD600D817AD /* Generate BuildSettings */,
 				C55B139A2D87D0F100E77939 /* Sources */,
 				C55B139B2D87D0F100E77939 /* Frameworks */,
 				C55B139C2D87D0F100E77939 /* CopyFiles */,
@@ -242,11 +243,63 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				C55B13B62D87D16600E77939 /* README.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		C57BC9D12D9E3F9400D817AD /* Generate BuildSettings */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/MCPExample/xcconfig/MCPExample-Debug.xcconfig",
+				"$(SRCROOT)/MCPExample/xcconfig/MCPExample-Release.xcconfig",
+				"$(SRCROOT)/MCPExample/xcconfig/MCPExample-Shared.xcconfig",
+				"$(SRCROOT)/MCPExample/xcconfig/Project-Debug.xcconfig",
+				"$(SRCROOT)/MCPExample/xcconfig/Project-Release.xcconfig",
+				"$(SRCROOT)/MCPExample/xcconfig/Project-Shared.xcconfig",
+			);
+			name = "Generate BuildSettings";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(SRCROOT)/MCPExample/BuildSettings.swift",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "outputfile=\"${SRCROOT}/MCPExample/BuildSettings.swift\"\n\nproperties=(\n    \"ASSET_ORIGINAL_ICON\"\n    \"ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES\"\n    \"ASSETCATALOG_COMPILER_APPICON_NAME\"\n    \"CI_BUILD_NUMBER\"\n    \"CI_COMMIT\"\n    \"CUSTOM_SERVER_ENDPOINT\"\n    \"CUSTOM_URL_ICON\"\n    \"CUSTOM_URL_SCHEME\"\n    \"GROUP_IDENTIFIER\"\n    \"PARENT_BUNDLE_IDENTIFIER\"\n    \"PRODUCT_BUNDLE_IDENTIFIER\"\n)\n\necho \"\" > \"$outputfile\"\necho \"// DO NOT EDIT. This file is auto-generated.\" > \"$outputfile\"\necho \"enum BuildSettings {\" >> \"$outputfile\"\n\necho \"    #if DEBUG\" >> \"$outputfile\"\necho \"    static let ENVIRONMENT = \\\"Debug\\\"\" >> \"$outputfile\"\necho \"    #else\" >> \"$outputfile\"\necho \"    static let ENVIRONMENT = \\\"Release\\\"\" >> \"$outputfile\"\necho \"    #endif\" >> \"$outputfile\"\n\nfor property in \"${properties[@]}\"\ndo\n    value=$(eval \"echo \\$$property\")\n    echo \"    static let $property = \\\"$value\\\"\" >> \"$outputfile\"\ndone\n#echo \"    static let PRODUCT_BUNDLE_IDENTIFIER = \\\"${PRODUCT_BUNDLE_IDENTIFIER}\\\"\" >> \"$outputfile\"\n#echo \"    static let GROUP_IDENTIFIER = \\\"${GROUP_IDENTIFIER}\\\"\" >> \"$outputfile\"\necho \"}\" >> \"$outputfile\"\n";
+		};
+		C57BC9D22D9E3FD600D817AD /* Generate BuildSettings */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/MCPExample/xcconfig/mcp-helper-Debug.xcconfig",
+				"$(SRCROOT)/MCPExample/xcconfig/mcp-helper-Release.xcconfig",
+				"$(SRCROOT)/MCPExample/xcconfig/mcp-helper-Shared.xcconfig",
+				"$(SRCROOT)/MCPExample/xcconfig/Project-Debug.xcconfig",
+				"$(SRCROOT)/MCPExample/xcconfig/Project-Release.xcconfig",
+				"$(SRCROOT)/MCPExample/xcconfig/Project-Shared.xcconfig",
+			);
+			name = "Generate BuildSettings";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(SRCROOT)/mcp-helper/BuildSettings.swift",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "outputfile=\"${SRCROOT}/mcp-helper/BuildSettings.swift\"\n\nproperties=(\n    \"ASSET_ORIGINAL_ICON\"\n    \"ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES\"\n    \"ASSETCATALOG_COMPILER_APPICON_NAME\"\n    \"CI_BUILD_NUMBER\"\n    \"CI_COMMIT\"\n    \"CUSTOM_SERVER_ENDPOINT\"\n    \"CUSTOM_URL_ICON\"\n    \"CUSTOM_URL_SCHEME\"\n    \"GROUP_IDENTIFIER\"\n    \"PARENT_BUNDLE_IDENTIFIER\"\n    \"PRODUCT_BUNDLE_IDENTIFIER\"\n)\n\necho \"\" > \"$outputfile\"\necho \"// DO NOT EDIT. This file is auto-generated.\" > \"$outputfile\"\necho \"enum BuildSettings {\" >> \"$outputfile\"\n\necho \"    #if DEBUG\" >> \"$outputfile\"\necho \"    static let ENVIRONMENT = \\\"Debug\\\"\" >> \"$outputfile\"\necho \"    #else\" >> \"$outputfile\"\necho \"    static let ENVIRONMENT = \\\"Release\\\"\" >> \"$outputfile\"\necho \"    #endif\" >> \"$outputfile\"\n\nfor property in \"${properties[@]}\"\ndo\n    value=$(eval \"echo \\$$property\")\n    echo \"    static let $property = \\\"$value\\\"\" >> \"$outputfile\"\ndone\n#echo \"    static let PRODUCT_BUNDLE_IDENTIFIER = \\\"${PRODUCT_BUNDLE_IDENTIFIER}\\\"\" >> \"$outputfile\"\n#echo \"    static let GROUP_IDENTIFIER = \\\"${GROUP_IDENTIFIER}\\\"\" >> \"$outputfile\"\necho \"}\" >> \"$outputfile\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		C55B13572D87CDAC00E77939 /* Sources */ = {
