@@ -14,28 +14,26 @@ public class PipeTestHelpers {
         pipePath: URL,
         completion: ((Bool) -> Void)? = nil
     ) {
-        // Create a write pipe
-        guard let writePipe = WritePipe(url: pipePath) else {
+        var writePipe: WritePipe?
+        do {
+            // Create a write pipe
+            let pipe = try WritePipe(url: pipePath)
+            writePipe = pipe
+
+            // Open the pipe for writing
+            try pipe.open()
+
+            // Write test message to the pipe
+            try pipe.write(message)
+
+            // Close the pipe
+            pipe.close()
+
+            completion?(true)
+        } catch {
+            writePipe?.close()
             completion?(false)
-            return
         }
-
-        // Open the pipe for writing
-        guard writePipe.open() else {
-            completion?(false)
-            return
-        }
-
-        // Write test message to the pipe
-        if !writePipe.write(message) {
-            Logging.printError("Failed to write message")
-        }
-
-        // Close the pipe
-        writePipe.close()
-
-        completion?(true)
-        return
     }
 
     /// Tests writing to a pipe asynchronously

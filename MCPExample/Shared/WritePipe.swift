@@ -1,6 +1,20 @@
 import Foundation
 import Darwin
 
+/// Errors that can occur when working with WritePipe
+enum WritePipeError: Error {
+    case invalidURL
+    case failedToCreatePipe(String)
+    case pipeAlreadyExists
+    case pipeDoesNotExist
+    case notAPipe
+    case openFailed(String)
+    case getFlagsFailed(String)
+    case setFlagsFailed(String)
+    case pipeNotOpened
+    case writeError(Error)
+}
+
 /// A class for creating and writing to a named pipe (FIFO)
 class WritePipe {
     private let fileURL: URL
@@ -8,18 +22,17 @@ class WritePipe {
 
     /// Initialize with a URL that represents where the pipe should be created
     /// - Parameter url: A file URL where the pipe should be created
-    init?(url: URL) {
+    /// - Throws: WritePipeError if initialization fails
+    init(url: URL) throws {
         guard url.isFileURL else {
             Logging.printError("Error: URL must be a file URL")
-            return nil
+            throw WritePipeError.invalidURL
         }
 
         self.fileURL = url
 
         // Create the pipe
-        if !createPipe() {
-            return nil
-        }
+        try createPipe()
     }
 
     deinit {
@@ -27,8 +40,8 @@ class WritePipe {
     }
 
     /// Creates the named pipe at the specified URL
-    /// - Returns: Boolean indicating success
-    private func createPipe() -> Bool {
+    /// - Throws: WritePipeError if creation fails
+    private func createPipe() throws {
         let pipePath = fileURL.path
         let fileManager = FileManager.default
 
@@ -36,13 +49,13 @@ class WritePipe {
         if fileManager.fileExists(atPath: pipePath) {
             // Check if it's a pipe using FileManager extension
             if fileManager.isPipe(at: fileURL) {
-                return true
+                return
             } else {
                 do {
                     try fileManager.removeItem(atPath: pipePath)
                 } catch {
                     Logging.printError("Error removing existing file at \(pipePath)", error: error)
-                    return false
+                    throw WritePipeError.pipeAlreadyExists
                 }
             }
         }
@@ -54,30 +67,29 @@ class WritePipe {
         if result != 0 {
             let errorString = String(cString: strerror(errno))
             Logging.printError("Error creating pipe at \(pipePath): \(errorString) (errno: \(errno))")
-            return false
+            throw WritePipeError.failedToCreatePipe(errorString)
         }
 
         // Verify it's actually a pipe
         if !fileManager.isPipe(at: fileURL) {
             Logging.printError("Created file is not detected as a pipe, this may cause issues")
+            throw WritePipeError.notAPipe
         }
-
-        return true
     }
 
     /// Opens the pipe for writing using non-blocking mode to prevent hanging
-    /// - Returns: Boolean indicating success
-    func open() -> Bool {
+    /// - Throws: WritePipeError if opening fails
+    func open() throws {
         // Make sure the path exists and is a pipe
         let pipePath = fileURL.path
         guard FileManager.default.fileExists(atPath: pipePath) else {
             Logging.printError("Pipe does not exist at path: \(pipePath)")
-            return false
+            throw WritePipeError.pipeDoesNotExist
         }
 
         guard FileManager.default.isPipe(at: fileURL) else {
             Logging.printError("File at \(pipePath) is not a pipe")
-            return false
+            throw WritePipeError.notAPipe
         }
 
         // Open with O_NONBLOCK flag to prevent blocking on open
@@ -86,8 +98,7 @@ class WritePipe {
             let errorString = String(cString: strerror(errno))
             Logging.printError("Error opening pipe for writing: \(errorString) (errno: \(errno))")
             PipeTestHelpers.printPipeStatus(pipePath: fileURL)
-
-            return false
+            throw WritePipeError.openFailed(errorString)
         }
 
         // Get current flags
@@ -96,7 +107,7 @@ class WritePipe {
             let errorString = String(cString: strerror(errno))
             Logging.printError("Error getting file descriptor flags: \(errorString)")
             Darwin.close(fileDescriptor)  // Close the FD to prevent leaks
-            return false
+            throw WritePipeError.getFlagsFailed(errorString)
         }
 
         // Reset the O_NONBLOCK flag for normal writing
@@ -105,38 +116,35 @@ class WritePipe {
         if result == -1 {
             let errorString = String(cString: strerror(errno))
             Logging.printError("Error setting file descriptor flags: \(errorString)")
-            // Continue anyway since we can still use the file descriptor
+            // We still create the file handle but log the error
         }
 
         // Create file handle from file descriptor
         fileHandle = FileHandle(fileDescriptor: fileDescriptor, closeOnDealloc: true)
-
-        return true
     }
 
     /// Writes data to the pipe
     /// - Parameter data: The data to write
-    /// - Returns: Boolean indicating success
-    func write(_ data: Data) -> Bool {
+    /// - Throws: WritePipeError if writing fails
+    func write(_ data: Data) throws {
         guard let fileHandle = fileHandle else {
             Logging.printError("Error: Pipe not opened")
-            return false
+            throw WritePipeError.pipeNotOpened
         }
 
         do {
             try fileHandle.write(contentsOf: data)
-            return true
         } catch {
             Logging.printError("Error writing to pipe", error: error)
-            return false
+            throw WritePipeError.writeError(error)
         }
     }
 
     /// Writes a string to the pipe (converts to UTF8 data)
     /// - Parameter string: The string to write
-    /// - Returns: Boolean indicating success
-    func write(_ string: String) -> Bool {
-        return write(Data(string.utf8))
+    /// - Throws: WritePipeError if writing fails
+    func write(_ string: String) throws {
+        try write(Data(string.utf8))
     }
 
     /// Closes the pipe
