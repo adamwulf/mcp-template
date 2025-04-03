@@ -43,36 +43,28 @@ final class PipeReader: ObservableObject, Sendable {
         guard !isReading else { return }
         
         isReading = true
-        print("Starting to read from pipe...")
-        
+
         let pipePath = PipeConstants.testPipePath()
-        print("Pipe path: \(pipePath.path)")
-        
+
         pipeReadTask = Task {
             // Create a read pipe
             guard let readPipe = ReadPipe(url: pipePath) else {
-                print("Failed to create read pipe")
                 isReading = false
                 return
             }
-            
-            print("Read pipe created successfully")
             
             // Open the pipe for reading
             guard readPipe.open() else {
-                print("Failed to open read pipe")
                 isReading = false
                 return
             }
-            
-            print("Pipe opened for reading")
             
             // Continuously read from the pipe while isReading is true
             while isReading && !Task.isCancelled {
                 if let message = readPipe.readString() {
                     DispatchQueue.main.async {
                         self.messages.append(message)
-                        messageHandler("Received: \(message)")
+                        messageHandler(message)
                     }
                 }
                 
@@ -80,9 +72,7 @@ final class PipeReader: ObservableObject, Sendable {
                 try? await Task.sleep(for: .milliseconds(100))
             }
             
-            // Close the pipe
             readPipe.close()
-            print("Pipe closed")
         }
     }
     

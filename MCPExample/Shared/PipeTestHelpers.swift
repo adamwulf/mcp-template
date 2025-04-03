@@ -9,44 +9,33 @@ public class PipeTestHelpers {
     ///   - pipePath: The URL path to the pipe (defaults to the test pipe path)
     ///   - completion: Optional completion handler called with success/failure status
     /// - Returns: Boolean indicating success
-    @discardableResult
     public static func testWritePipe(
-        message: String = "Hello World from PipeTestHelpers!",
-        pipePath: URL = PipeConstants.testPipePath(),
+        message: String,
+        pipePath: URL,
         completion: ((Bool) -> Void)? = nil
-    ) -> Bool {
-        Logging.printInfo("Creating write pipe at: \(pipePath.path)")
-        
+    ) {
         // Create a write pipe
         guard let writePipe = WritePipe(url: pipePath) else {
-            Logging.printError("Failed to create write pipe")
             completion?(false)
-            return false
+            return
         }
         
         // Open the pipe for writing
         guard writePipe.open() else {
-            Logging.printError("Failed to open write pipe")
             completion?(false)
-            return false
+            return
         }
         
-        // Write to the pipe
-        Logging.printInfo("Writing message: \(message)")
-        
-        let success = writePipe.write(message)
-        if success {
-            Logging.printInfo("Message written successfully")
-        } else {
+        // Write test message to the pipe
+        if !writePipe.write(message) {
             Logging.printError("Failed to write message")
         }
         
         // Close the pipe
         writePipe.close()
-        Logging.printInfo("Pipe test completed")
-        
-        completion?(success)
-        return success
+
+        completion?(true)
+        return
     }
     
     /// Tests writing to a pipe asynchronously

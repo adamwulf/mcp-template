@@ -31,11 +31,9 @@ struct RunCommand: AsyncParsableCommand {
         
         // Use the new PipeTestHelpers to test pipe functionality
         Task {
-            logger.info("Starting pipe test using PipeTestHelpers...")
             let success = await PipeTestHelpers.testWritePipeAsync(
                 message: "Hello World from mcp-helper through PipeTestHelpers!"
             )
-            logger.info("Pipe test result: \(success ? "successful" : "failed")")
         }
 
         // Set up signal handling to gracefully exit
@@ -79,7 +77,6 @@ struct RunCommand: AsyncParsableCommand {
 
         Task {
             try await Task.sleep(for: .seconds(30))
-            logger.info("registering extra tool")
 
             do {
                 // Register a simple tool with no input
@@ -89,7 +86,6 @@ struct RunCommand: AsyncParsableCommand {
                 )) { input in
                     return Result(content: [.text(helloworld())], isError: false)
                 }
-                logger.info("registered extra tool")
             } catch {
                 logger.error("failed registering extra tool: \(error)")
             }

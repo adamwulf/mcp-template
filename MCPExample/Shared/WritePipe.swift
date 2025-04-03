@@ -15,8 +15,7 @@ class WritePipe {
         }
         
         self.fileURL = url
-        Logging.printInfo("WritePipe init with path: \(url.path)")
-        
+
         // Create the pipe
         if !createPipe() {
             return nil
@@ -33,19 +32,14 @@ class WritePipe {
         let pipePath = fileURL.path
         let fileManager = FileManager.default
         
-        Logging.printInfo("Creating pipe at path: \(pipePath)")
-        
         // Check if the path already exists
         if fileManager.fileExists(atPath: pipePath) {
             // Check if it's a pipe using FileManager extension
             if fileManager.isPipe(at: fileURL) {
-                Logging.printInfo("Pipe already exists at \(pipePath)")
                 return true
             } else {
-                Logging.printInfo("File exists but is not a pipe, attempting to remove: \(pipePath)")
                 do {
                     try fileManager.removeItem(atPath: pipePath)
-                    Logging.printInfo("Successfully removed existing file at \(pipePath)")
                 } catch {
                     Logging.printError("Error removing existing file at \(pipePath)", error: error)
                     return false
@@ -55,7 +49,6 @@ class WritePipe {
         
         // Create the pipe with read/write permissions for user, group, and others
         // 0o666 = rw-rw-rw-
-        Logging.printInfo("Creating named pipe with mkfifo at \(pipePath)")
         let result = mkfifo(pipePath, 0o666)
         
         if result != 0 {
@@ -63,19 +56,14 @@ class WritePipe {
             Logging.printError("Error creating pipe at \(pipePath): \(errorString) (errno: \(errno))")
             return false
         }
-        
-        Logging.printInfo("Successfully created pipe at \(pipePath)")
-        
+
         // Check permissions on the created pipe
         if let attributes = try? fileManager.attributesOfItem(atPath: pipePath),
            let posixPermissions = attributes[.posixPermissions] as? NSNumber {
-            Logging.printInfo("Pipe permissions: \(String(format: "%o", posixPermissions.intValue))")
         }
         
         // Verify it's actually a pipe
-        if fileManager.isPipe(at: fileURL) {
-            Logging.printInfo("Verified that the created file is a pipe")
-        } else {
+        if !fileManager.isPipe(at: fileURL) {
             Logging.printError("Created file is not detected as a pipe, this may cause issues")
         }
         
@@ -85,9 +73,6 @@ class WritePipe {
     /// Opens the pipe for writing using non-blocking mode to prevent hanging
     /// - Returns: Boolean indicating success
     func open() -> Bool {
-        Logging.printInfo("Opening pipe for writing: \(fileURL.path)")
-        Logging.printInfo("Current process: \(ProcessInfo.processInfo.processName), PID: \(ProcessInfo.processInfo.processIdentifier)")
-        
         // Make sure the path exists and is a pipe
         let pipePath = fileURL.path
         guard FileManager.default.fileExists(atPath: pipePath) else {
@@ -99,43 +84,17 @@ class WritePipe {
             Logging.printError("File at \(pipePath) is not a pipe")
             return false
         }
-        
-        // Check directory permissions
-        let dirPath = fileURL.deletingLastPathComponent().path
-        if let attributes = try? FileManager.default.attributesOfItem(atPath: dirPath) {
-            if let permissions = attributes[.posixPermissions] as? NSNumber {
-                Logging.printInfo("Directory permissions: \(String(format: "%o", permissions.intValue))")
-            }
-            if let owner = attributes[.ownerAccountName] as? String {
-                Logging.printInfo("Directory owner: \(owner)")
-            }
-        }
-        
-        // Check pipe permissions
-        if let attributes = try? FileManager.default.attributesOfItem(atPath: pipePath) {
-            if let permissions = attributes[.posixPermissions] as? NSNumber {
-                Logging.printInfo("Pipe permissions: \(String(format: "%o", permissions.intValue))")
-            }
-            if let owner = attributes[.ownerAccountName] as? String {
-                Logging.printInfo("Pipe owner: \(owner)")
-            }
-        }
-        
+
         // Open with O_NONBLOCK flag to prevent blocking on open
         let fileDescriptor = Darwin.open(pipePath, O_WRONLY | O_NONBLOCK, 0)
         if fileDescriptor == -1 {
             let errorString = String(cString: strerror(errno))
             Logging.printError("Error opening pipe for writing: \(errorString) (errno: \(errno))")
-            
-            // More detailed error diagnostics
-            Logging.printInfo("Checking pipe status...")
             PipeTestHelpers.printPipeStatus(pipePath: fileURL)
             
             return false
         }
-        
-        Logging.printInfo("Successfully opened pipe for writing with file descriptor: \(fileDescriptor)")
-        
+
         // Get current flags
         let flags = fcntl(fileDescriptor, F_GETFL)
         if flags == -1 {
@@ -156,8 +115,7 @@ class WritePipe {
         
         // Create file handle from file descriptor
         fileHandle = FileHandle(fileDescriptor: fileDescriptor, closeOnDealloc: true)
-        Logging.printInfo("Created FileHandle for writing")
-        
+
         return true
     }
     
@@ -170,10 +128,8 @@ class WritePipe {
             return false
         }
         
-        Logging.printInfo("Writing \(data.count) bytes to pipe")
         do {
             try fileHandle.write(contentsOf: data)
-            Logging.printInfo("Successfully wrote data to pipe")
             return true
         } catch {
             Logging.printError("Error writing to pipe", error: error)
@@ -185,18 +141,11 @@ class WritePipe {
     /// - Parameter string: The string to write
     /// - Returns: Boolean indicating success
     func write(_ string: String) -> Bool {
-        Logging.printInfo("Writing string to pipe: \(string)")
-        guard let data = string.data(using: .utf8) else {
-            Logging.printError("Error converting string to data")
-            return false
-        }
-        
-        return write(data)
+        return write(Data(string.utf8))
     }
     
     /// Closes the pipe
     func close() {
-        Logging.printInfo("Closing write pipe")
         try? fileHandle?.close()
         fileHandle = nil
     }

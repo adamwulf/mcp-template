@@ -9,16 +9,6 @@ public enum PipeConstants {
             fatalError("Failed to access app group container: \(BuildSettings.GROUP_IDENTIFIER). Ensure entitlements are properly configured.")
         }
         
-        let pipePath = sharedContainerURL.appendingPathComponent("mcp_test_pipe")
-        
-        print("======== PIPE PATH DEBUG INFO ========")
-        print("Process: \(ProcessInfo.processInfo.processName)")
-        print("Bundle ID: \(Bundle.main.bundleIdentifier ?? "Unknown")")
-        print("App group: \(BuildSettings.GROUP_IDENTIFIER)")
-        print("Shared container: \(sharedContainerURL.path)")
-        print("Pipe path: \(pipePath.path)")
-        print("======================================")
-        
-        return pipePath
+        return sharedContainerURL.appendingPathComponent("mcp_test_pipe")
     }
 } 
