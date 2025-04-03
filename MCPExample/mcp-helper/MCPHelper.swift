@@ -31,7 +31,7 @@ struct RunCommand: AsyncParsableCommand {
 
         // Use the new PipeTestHelpers to test pipe functionality
         Task {
-            let success = await PipeTestHelpers.testWritePipeAsync(
+            await PipeTestHelpers.testWritePipeAsync(
                 message: "Hello World from mcp-helper through PipeTestHelpers!"
             )
         }

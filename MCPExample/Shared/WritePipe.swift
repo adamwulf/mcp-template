@@ -57,11 +57,6 @@ class WritePipe {
             return false
         }
 
-        // Check permissions on the created pipe
-        if let attributes = try? fileManager.attributesOfItem(atPath: pipePath),
-           let posixPermissions = attributes[.posixPermissions] as? NSNumber {
-        }
-
         // Verify it's actually a pipe
         if !fileManager.isPipe(at: fileURL) {
             Logging.printError("Created file is not detected as a pipe, this may cause issues")

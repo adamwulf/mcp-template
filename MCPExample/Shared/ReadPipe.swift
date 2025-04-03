@@ -1,6 +1,21 @@
 import Foundation
 import Darwin
 
+/// Errors that can occur when working with ReadPipe
+enum ReadPipeError: Error {
+    case invalidURL
+    case failedToCreatePipe(String)
+    case pipeAlreadyExists
+    case pipeDoesNotExist
+    case notAPipe
+    case openFailed(String)
+    case getFlagsFailed(String)
+    case setFlagsFailed(String)
+    case pipeNotOpened
+    case readError(Error)
+    case stringEncodingError
+}
+
 /// A class for creating and reading from a named pipe (FIFO)
 class ReadPipe {
     private let fileURL: URL
@@ -8,17 +23,16 @@ class ReadPipe {
 
     /// Initialize with a URL that represents where the pipe should be created
     /// - Parameter url: A file URL where the pipe should be created
-    init?(url: URL) {
+    /// - Throws: ReadPipeError if initialization fails
+    init(url: URL) throws {
         guard url.isFileURL else {
-            return nil
+            throw ReadPipeError.invalidURL
         }
 
         self.fileURL = url
 
         // Create the pipe
-        if !createPipe() {
-            return nil
-        }
+        try createPipe()
     }
 
     deinit {
@@ -26,8 +40,8 @@ class ReadPipe {
     }
 
     /// Creates the named pipe at the specified URL
-    /// - Returns: Boolean indicating success
-    private func createPipe() -> Bool {
+    /// - Throws: ReadPipeError if creation fails
+    private func createPipe() throws {
         let pipePath = fileURL.path
         let fileManager = FileManager.default
 
@@ -35,12 +49,12 @@ class ReadPipe {
         if fileManager.fileExists(atPath: pipePath) {
             // Check if it's a pipe using FileManager extension
             if fileManager.isPipe(at: fileURL) {
-                return true
+                return
             } else {
                 do {
                     try fileManager.removeItem(atPath: pipePath)
                 } catch {
-                    return false
+                    throw ReadPipeError.pipeAlreadyExists
                 }
             }
         }
@@ -51,28 +65,26 @@ class ReadPipe {
 
         if result != 0 {
             let errorString = String(cString: strerror(errno))
-            return false
+            throw ReadPipeError.failedToCreatePipe(errorString)
         }
 
         // Verify it's actually a pipe
         guard fileManager.isPipe(at: fileURL) else {
-            return false
+            throw ReadPipeError.notAPipe
         }
-
-        return true
     }
 
     /// Opens the pipe for reading without blocking on open, but allowing blocking reads
-    /// - Returns: Boolean indicating success
-    func open() -> Bool {
+    /// - Throws: ReadPipeError if opening fails
+    func open() throws {
         // Make sure the path exists and is a pipe
         let pipePath = fileURL.path
         guard FileManager.default.fileExists(atPath: pipePath) else {
-            return false
+            throw ReadPipeError.pipeDoesNotExist
         }
 
         guard FileManager.default.isPipe(at: fileURL) else {
-            return false
+            throw ReadPipeError.notAPipe
         }
 
         // First open with O_NONBLOCK flag to prevent blocking on open
@@ -81,7 +93,7 @@ class ReadPipe {
             let errorString = String(cString: strerror(errno))
             Logging.printError("Error opening pipe for reading: \(errorString) (errno: \(errno))")
             PipeTestHelpers.printPipeStatus(pipePath: fileURL)
-            return false
+            throw ReadPipeError.openFailed(errorString)
         }
 
         // Get flags
@@ -90,7 +102,7 @@ class ReadPipe {
             let errorString = String(cString: strerror(errno))
             Logging.printError("Error getting file descriptor flags: \(errorString)")
             Darwin.close(fileDescriptor)  // Close the FD to prevent leaks
-            return false
+            throw ReadPipeError.getFlagsFailed(errorString)
         }
 
         // Set flags - check for error
@@ -98,44 +110,45 @@ class ReadPipe {
         if result == -1 {
             let errorString = String(cString: strerror(errno))
             Logging.printError("Error setting file descriptor flags: \(errorString)")
-            // Continue since we can still use the file descriptor
+            // We still create the file handle but log the error
         }
 
         // Create file handle
         fileHandle = FileHandle(fileDescriptor: fileDescriptor, closeOnDealloc: true)
-
-        return true
     }
 
     /// Reads data from the pipe (blocking)
-    /// - Returns: Data read from the pipe, or nil if there was an error
-    func read() -> Data? {
+    /// - Returns: Data read from the pipe
+    /// - Throws: ReadPipeError if reading fails
+    func read() throws -> Data {
         guard let fileHandle = fileHandle else {
             Logging.printError("Error: Pipe not opened")
-            return nil
+            throw ReadPipeError.pipeNotOpened
         }
 
         do {
             // This will block until data is available
-            return try fileHandle.readToEnd()
+            guard let data = try fileHandle.readToEnd() else {
+                throw ReadPipeError.readError(NSError(domain: "ReadPipe", code: -1, userInfo: [NSLocalizedDescriptionKey: "EOF or empty read"]))
+            }
+            return data
         } catch {
             Logging.printError("Error reading from pipe", error: error)
-            return nil
+            throw ReadPipeError.readError(error)
         }
     }
 
     /// Reads data from the pipe and converts it to a string
-    /// - Returns: String read from the pipe, or nil if there was an error
-    func readString() -> String? {
-        guard let data = read() else {
-            return nil
+    /// - Returns: String read from the pipe
+    /// - Throws: ReadPipeError if reading or string conversion fails
+    func readString() throws -> String {
+        let data = try read()
+
+        guard let string = String(data: data, encoding: .utf8) else {
+            throw ReadPipeError.stringEncodingError
         }
 
-        if let string = String(data: data, encoding: .utf8) {
-            return string
-        } else {
-            return nil
-        }
+        return string
     }
 
     /// Closes the pipe

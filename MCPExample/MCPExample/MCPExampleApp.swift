@@ -47,32 +47,32 @@ final class PipeReader: ObservableObject, Sendable {
         let pipePath = PipeConstants.testPipePath()
 
         pipeReadTask = Task {
-            // Create a read pipe
-            guard let readPipe = ReadPipe(url: pipePath) else {
-                isReading = false
-                return
-            }
+            var readPipe: ReadPipe?
+            do {
+                // Create a read pipe
+                let pipe = try ReadPipe(url: pipePath)
+                readPipe = pipe
 
-            // Open the pipe for reading
-            guard readPipe.open() else {
-                isReading = false
-                return
-            }
+                // Open the pipe for reading
+                try pipe.open()
 
-            // Continuously read from the pipe while isReading is true
-            while isReading && !Task.isCancelled {
-                if let message = readPipe.readString() {
+                // Continuously read from the pipe while isReading is true
+                while isReading && !Task.isCancelled {
+                    let message = try pipe.readString()
                     DispatchQueue.main.async {
                         self.messages.append(message)
                         messageHandler(message)
                     }
+
+                    // Add a small delay to avoid tight loop
+                    try? await Task.sleep(for: .milliseconds(100))
                 }
 
-                // Add a small delay to avoid tight loop
-                try? await Task.sleep(for: .milliseconds(100))
+                pipe.close()
+            } catch {
+                readPipe?.close()
+                isReading = false
             }
-
-            readPipe.close()
         }
     }
 
