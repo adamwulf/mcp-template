@@ -8,7 +8,7 @@ public enum PipeConstants {
         guard let sharedContainerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: BuildSettings.GROUP_IDENTIFIER) else {
             fatalError("Failed to access app group container: \(BuildSettings.GROUP_IDENTIFIER). Ensure entitlements are properly configured.")
         }
-        
+
         return sharedContainerURL.appendingPathComponent("mcp_test_pipe")
     }
-} 
+}

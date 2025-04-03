@@ -28,7 +28,7 @@ struct RunCommand: AsyncParsableCommand {
         let mcp = EasyMCP(logger: logger)
 
         try await Task.sleep(for: .seconds(3))
-        
+
         // Use the new PipeTestHelpers to test pipe functionality
         Task {
             let success = await PipeTestHelpers.testWritePipeAsync(
@@ -51,7 +51,7 @@ struct RunCommand: AsyncParsableCommand {
         try await mcp.register(tool: Tool(
             name: "helloWorld",
             description: "Returns a friendly greeting message"
-        )) { input in
+        )) { _ in
             return Result(content: [.text(helloworld())], isError: false)
         }
 
@@ -83,7 +83,7 @@ struct RunCommand: AsyncParsableCommand {
                 try await mcp.register(tool: Tool(
                     name: "helloEveryone",
                     description: "Returns a friendly greeting message to everyone around"
-                )) { input in
+                )) { _ in
                     return Result(content: [.text(helloworld())], isError: false)
                 }
             } catch {

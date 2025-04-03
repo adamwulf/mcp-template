@@ -49,7 +49,7 @@ struct RunCommand: AsyncParsableCommand {
             try await mcp.register(tool: Tool(
                 name: "helloWorld",
                 description: "Returns a friendly greeting message"
-            )) { input in
+            )) { _ in
                 return Result(content: [.text(helloworld())], isError: false)
             }
         } catch {
@@ -96,7 +96,7 @@ struct RunCommand: AsyncParsableCommand {
                 try await mcp.register(tool: Tool(
                     name: "helloEveryone",
                     description: "Returns a friendly greeting message to everyone around"
-                )) { input in
+                )) { _ in
                     return Result(content: [.text(helloworld())], isError: false)
                 }
                 logger.info("registered extra tool")

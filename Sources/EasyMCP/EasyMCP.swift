@@ -85,7 +85,6 @@ public final class EasyMCP: @unchecked Sendable {
         await server?.waitUntilCompleted()
     }
 
-
     /// Stop the MCP server
     public func stop() async {
         guard isRunning, let server = server else {

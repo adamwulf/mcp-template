@@ -10,7 +10,7 @@ public enum Logging {
             stderr.write(data)
         }
     }
-    
+
     /// Prints an error message with a specific error object to standard error
     /// - Parameters:
     ///   - message: The error message prefix
@@ -18,13 +18,13 @@ public enum Logging {
     public static func printError(_ message: String, error: Error) {
         printError("\(message): \(error.localizedDescription)")
     }
-    
+
     /// Prints a warning message to standard error
     /// - Parameter message: The warning message to print
     public static func printWarning(_ message: String) {
         printError("Warning: \(message)")
     }
-    
+
     /// Prints an info message to standard output
     /// - Parameter message: The info message to print
     public static func printInfo(_ message: String) {
@@ -32,4 +32,4 @@ public enum Logging {
             FileHandle.standardError.write(data)
         }
     }
-} 
+}
