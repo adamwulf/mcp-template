@@ -121,6 +121,7 @@ class ReadPipe {
     /// - Returns: Data read from the pipe
     /// - Throws: ReadPipeError if reading fails
     func read() throws -> Data {
+        assert(!Thread.isMainThread, "do not read on the main thread")
         guard let fileHandle = fileHandle else {
             Logging.printError("Error: Pipe not opened")
             throw ReadPipeError.pipeNotOpened
@@ -128,10 +129,13 @@ class ReadPipe {
 
         do {
             // This will block until data is available
-            guard let data = try fileHandle.readToEnd() else {
-                throw ReadPipeError.readError(NSError(domain: "ReadPipe", code: -1, userInfo: [NSLocalizedDescriptionKey: "EOF or empty read"]))
+            while true {
+                if let data = try fileHandle.readToEnd() {
+                    return data
+                }
+                // Add a small delay to prevent tight loop
+                Thread.sleep(forTimeInterval: 0.1) // 100ms delay
             }
-            return data
         } catch {
             Logging.printError("Error reading from pipe", error: error)
             throw ReadPipeError.readError(error)
@@ -142,6 +146,7 @@ class ReadPipe {
     /// - Returns: String read from the pipe
     /// - Throws: ReadPipeError if reading or string conversion fails
     func readString() throws -> String {
+        assert(!Thread.isMainThread, "do not read on the main thread")
         let data = try read()
 
         guard let string = String(data: data, encoding: .utf8) else {

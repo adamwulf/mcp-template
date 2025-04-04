@@ -1,26 +1,5 @@
 import Foundation
 
-/// Constants for pipe paths used for communication
-public enum PipeChannels {
-    /// Path to the pipe for sending messages from helper to app
-    public static func helperToAppPipePath() -> URL {
-        guard let sharedContainerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: BuildSettings.GROUP_IDENTIFIER) else {
-            fatalError("Failed to access app group container: \(BuildSettings.GROUP_IDENTIFIER)")
-        }
-
-        return sharedContainerURL.appendingPathComponent("helper_to_app_pipe")
-    }
-
-    /// Path to the pipe for sending messages from app to helper
-    public static func appToHelperPipePath() -> URL {
-        guard let sharedContainerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: BuildSettings.GROUP_IDENTIFIER) else {
-            fatalError("Failed to access app group container: \(BuildSettings.GROUP_IDENTIFIER)")
-        }
-
-        return sharedContainerURL.appendingPathComponent("app_to_helper_pipe")
-    }
-}
-
 /// Handles encoding/decoding and sending of tool messages through pipes
 public class PipeManager {
     /// Encodes an ExampleTool to JSON and writes it to the helper-to-app pipe
@@ -35,7 +14,7 @@ public class PipeManager {
             var data = jsonData
             data.append(10) // newline character
 
-            return await sendData(data, to: PipeChannels.helperToAppPipePath())
+            return await sendData(data, to: PipeConstants.helperToAppPipePath())
         } catch {
             Logging.printError("Error encoding tool: \(error)")
             return false
@@ -54,7 +33,7 @@ public class PipeManager {
             var data = jsonData
             data.append(10) // newline character
 
-            return await sendData(data, to: PipeChannels.appToHelperPipePath())
+            return await sendData(data, to: PipeConstants.appToHelperPipePath())
         } catch {
             Logging.printError("Error encoding response: \(error)")
             return false

@@ -39,12 +39,12 @@ public class PipeTestHelpers {
     /// Tests writing to a pipe asynchronously
     /// - Parameters:
     ///   - message: The message to write to the pipe
-    ///   - pipePath: The URL path to the pipe (defaults to the test pipe path)
+    ///   - pipePath: The URL path to the pipe (defaults to the helper-to-app pipe path)
     /// - Returns: Boolean indicating success
     @available(macOS 10.15, *)
     public static func testWritePipeAsync(
         message: String = "Hello World from PipeTestHelpers!",
-        pipePath: URL = PipeConstants.testPipePath()
+        pipePath: URL = PipeConstants.helperToAppPipePath()
     ) async -> Bool {
         return await withCheckedContinuation { continuation in
             testWritePipe(message: message, pipePath: pipePath) { success in
@@ -54,9 +54,9 @@ public class PipeTestHelpers {
     }
 
     /// Checks the status of a pipe file and returns diagnostic information
-    /// - Parameter pipePath: The URL path to the pipe (defaults to the test pipe path)
+    /// - Parameter pipePath: The URL path to the pipe (defaults to the helper-to-app pipe path)
     /// - Returns: Dictionary with diagnostic information
-    public static func checkPipeStatus(pipePath: URL = PipeConstants.testPipePath()) -> [String: String] {
+    public static func checkPipeStatus(pipePath: URL = PipeConstants.helperToAppPipePath()) -> [String: String] {
         let fileManager = FileManager.default
         var result: [String: String] = [:]
 
@@ -136,8 +136,8 @@ public class PipeTestHelpers {
     }
 
     /// Prints the status of a pipe to the console for debugging
-    /// - Parameter pipePath: The URL path to the pipe (defaults to the test pipe path)
-    public static func printPipeStatus(pipePath: URL = PipeConstants.testPipePath()) {
+    /// - Parameter pipePath: The URL path to the pipe (defaults to the helper-to-app pipe path)
+    public static func printPipeStatus(pipePath: URL = PipeConstants.helperToAppPipePath()) {
         let status = checkPipeStatus(pipePath: pipePath)
 
         Logging.printInfo("===== PIPE STATUS =====")
