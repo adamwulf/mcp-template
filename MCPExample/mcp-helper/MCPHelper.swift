@@ -49,7 +49,7 @@ struct RunCommand: AsyncParsableCommand, Decodable {
         try await pipes.open()
 
         // Send initialize message
-        await pipes.sendToolRequest(.initialize(helperId: helperId))
+        try await pipes.sendToolRequest(.initialize(helperId: helperId))
 
         // build server
         let logger = Logger(label: "com.milestonemade.easymcp")
@@ -70,7 +70,7 @@ struct RunCommand: AsyncParsableCommand, Decodable {
         signalSource.setEventHandler {
             Task {
                 // Send deinitialize message before stopping
-                await pipes.sendToolRequest(.deinitialize(helperId: self.helperId))
+                try await pipes.sendToolRequest(.deinitialize(helperId: self.helperId))
                 await mcp.stop()
                 RunCommand.exit()
             }
@@ -84,7 +84,7 @@ struct RunCommand: AsyncParsableCommand, Decodable {
         )) { _ in
             // Send the helloWorld request to the main app
             Task {
-                await pipes.sendToolRequest(.helloWorld(helperId: self.helperId, messageId: UUID().uuidString))
+                try await pipes.sendToolRequest(.helloWorld(helperId: self.helperId, messageId: UUID().uuidString))
             }
             return Result(content: [.text(helloworld())], isError: false)
         }
@@ -106,7 +106,7 @@ struct RunCommand: AsyncParsableCommand, Decodable {
             let name = input["name"]?.stringValue ?? "world"
             // Send the helloPerson request to the main app
             Task {
-                await pipes.sendToolRequest(.helloPerson(helperId: self.helperId, messageId: UUID().uuidString, name: name))
+                try await pipes.sendToolRequest(.helloPerson(helperId: self.helperId, messageId: UUID().uuidString, name: name))
             }
             return Result(content: [.text(hello(name))], isError: false)
         }
@@ -132,8 +132,7 @@ struct RunCommand: AsyncParsableCommand, Decodable {
 
         // Wait until the server is finished processing all input
         try await mcp.waitUntilComplete()
-
-        await pipes.sendToolRequest(.deinitialize(helperId: helperId))
+        try await pipes.sendToolRequest(.deinitialize(helperId: helperId))
         try await pipes.close()
     }
 

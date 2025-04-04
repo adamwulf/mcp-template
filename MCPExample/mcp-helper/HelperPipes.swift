@@ -7,6 +7,14 @@
 import Foundation
 
 actor HelperPipes {
+
+    enum Error: Swift.Error {
+        case encodeError(_ error: Swift.Error)
+        case decodeError(_ error: Swift.Error)
+        case sendError(_ error: Swift.Error)
+        case readError(_ error: Swift.Error)
+    }
+
     let writePipe: WritePipe
     let readPipe: ReadPipe
 
@@ -25,21 +33,25 @@ actor HelperPipes {
         await readPipe.close()
     }
 
-    @discardableResult
-    public func sendToolRequest(_ tool: MCPRequest) async -> Bool {
+    public func sendToolRequest(_ tool: MCPRequest) async throws {
+        let encoder = JSONEncoder()
+        let jsonData: Data
         do {
-            let encoder = JSONEncoder()
-            let jsonData = try encoder.encode(tool)
-
-            // Ensure we have a newline at the end for parsing on the other side
-            var data = jsonData
-            data.append(10) // newline character
-
-            try writePipe.write(data)
-            return true
+            jsonData = try encoder.encode(tool)
         } catch {
             Logging.printError("Error encoding tool: \(error)")
-            return false
+            throw Error.encodeError(error)
+        }
+
+        // Ensure we have a newline at the end for parsing on the other side
+        var data = jsonData
+        data.append(10) // newline character
+
+        do {
+            try writePipe.write(data)
+        } catch {
+            Logging.printError("Error encoding tool: \(error)")
+            throw Error.sendError(error)
         }
     }
 
@@ -48,9 +60,14 @@ actor HelperPipes {
     /// - Returns: The decoded ExampleToolResponse
     func readToolResponse() async throws -> MCPResponse {
         guard let string = try await readPipe.readLine() else {
-            throw ReadPipeError.eof
+            throw Error.readError(ReadPipeError.eof)
         }
-        let decoder = JSONDecoder()
-        return try decoder.decode(MCPResponse.self, from: Data(string.utf8))
+        do {
+            let decoder = JSONDecoder()
+            return try decoder.decode(MCPResponse.self, from: Data(string.utf8))
+        } catch {
+            Logging.printError("Error reading response: \(error)")
+            throw Error.readError(error)
+        }
     }
 }
