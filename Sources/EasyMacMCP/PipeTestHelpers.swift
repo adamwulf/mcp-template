@@ -43,7 +43,7 @@ public class PipeTestHelpers {
     @available(macOS 10.15, *)
     public static func testWritePipeAsync(
         message: String = "Hello World from PipeTestHelpers!",
-        pipePath: URL = PipeConstants.helperToAppPipePath()
+        pipePath: URL
     ) async -> Bool {
         return await testWritePipe(message: message, pipePath: pipePath)
     }
@@ -51,7 +51,7 @@ public class PipeTestHelpers {
     /// Checks the status of a pipe file and returns diagnostic information
     /// - Parameter pipePath: The URL path to the pipe (defaults to the helper-to-app pipe path)
     /// - Returns: Dictionary with diagnostic information
-    public static func checkPipeStatus(pipePath: URL = PipeConstants.helperToAppPipePath()) -> [String: String] {
+    public static func checkPipeStatus(pipePath: URL) -> [String: String] {
         let fileManager = FileManager.default
         var result: [String: String] = [:]
 

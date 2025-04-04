@@ -1,7 +1,7 @@
 import Foundation
 
 /// Represents responses sent from the main app back to the helper
-public enum MCPResponse: Codable {
+public enum MCPResponse: Sendable, Codable {
     /// A tool with no parameters that returns a greeting
     case helloWorld(helperId: String, messageId: String, result: String)
 

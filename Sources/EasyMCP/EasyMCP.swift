@@ -150,17 +150,11 @@ public final class EasyMCP: @unchecked Sendable {
             return try await toolMeta.handler(params.arguments ?? [:])
         }
 
-        await server.withMethodHandler(MCP.ListPrompts.self) { [weak self] _ in
-            guard let self = self else {
-                return ListPrompts.Result(prompts: [])
-            }
+        await server.withMethodHandler(MCP.ListPrompts.self) { _ in
             return ListPrompts.Result(prompts: [])
         }
 
-        await server.withMethodHandler(MCP.ListResources.self) { [weak self] _ in
-            guard let self = self else {
-                return ListResources.Result(resources: [])
-            }
+        await server.withMethodHandler(MCP.ListResources.self) { _ in
             return ListResources.Result(resources: [])
         }
 

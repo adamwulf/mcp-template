@@ -53,7 +53,7 @@ struct RunCommand: AsyncParsableCommand {
                 return Result(content: [.text(helloworld())], isError: false)
             }
         } catch {
-            FileHandle.standardError.write(("error 1: " + String(describing: error)).data(using: .utf8))
+            FileHandle.standardError.write(Data(("error 1: " + String(describing: error)).utf8))
             throw error
         }
 
@@ -75,7 +75,7 @@ struct RunCommand: AsyncParsableCommand {
                 return Result(content: [.text(hello(input["name"]?.stringValue ?? "world"))], isError: false)
             }
         } catch {
-            FileHandle.standardError.write(("error 1: " + String(describing: error)).data(using: .utf8))
+            FileHandle.standardError.write(Data(("error 1: " + String(describing: error)).utf8))
             throw error
         }
 
@@ -83,7 +83,7 @@ struct RunCommand: AsyncParsableCommand {
             // Start the server and keep it running
             try await mcp.start()
         } catch {
-            FileHandle.standardError.write(("error 1: " + String(describing: error)).data(using: .utf8))
+            FileHandle.standardError.write(Data(("error 1: " + String(describing: error)).utf8))
             throw error
         }
 
@@ -109,7 +109,7 @@ struct RunCommand: AsyncParsableCommand {
         do {
             try await mcp.waitUntilComplete()
         } catch {
-            FileHandle.standardError.write(("error 1: " + String(describing: error)).data(using: .utf8))
+            FileHandle.standardError.write(Data(("error 1: " + String(describing: error)).utf8))
             throw error
         }
     }
