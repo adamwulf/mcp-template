@@ -7,22 +7,22 @@
 import Foundation
 
 actor HelperPipes {
-    let helperToAppPipe: WritePipe
-    let appToHelperPipe: ReadPipe
+    let writePipe: WritePipe
+    let readPipe: ReadPipe
 
-    init(helperToAppPipe: WritePipe, appToHelperPipe: ReadPipe) {
-        self.helperToAppPipe = helperToAppPipe
-        self.appToHelperPipe = appToHelperPipe
+    init(writePipe: WritePipe, readPipe: ReadPipe) {
+        self.writePipe = writePipe
+        self.readPipe = readPipe
     }
 
     public func open() async throws {
-        try helperToAppPipe.open()
-        try await appToHelperPipe.open()
+        try writePipe.open()
+        try await readPipe.open()
     }
 
     public func close() async throws {
-        helperToAppPipe.close()
-        await appToHelperPipe.close()
+        writePipe.close()
+        await readPipe.close()
     }
 
     @discardableResult
@@ -35,7 +35,7 @@ actor HelperPipes {
             var data = jsonData
             data.append(10) // newline character
 
-            try helperToAppPipe.write(data)
+            try writePipe.write(data)
             return true
         } catch {
             Logging.printError("Error encoding tool: \(error)")
@@ -47,7 +47,7 @@ actor HelperPipes {
     /// - Parameter pipe: The ReadPipe to use
     /// - Returns: The decoded ExampleToolResponse
     func readToolResponse() async throws -> MCPResponse {
-        guard let string = try await appToHelperPipe.readLine() else {
+        guard let string = try await readPipe.readLine() else {
             throw ReadPipeError.eof
         }
         let decoder = JSONDecoder()

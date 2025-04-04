@@ -34,7 +34,7 @@ struct RunCommand: AsyncParsableCommand, Decodable {
         helperId = UUID().uuidString
         let helperToApp = try! WritePipe(url: PipeConstants.helperToAppPipePath())
         let appToHelper = try! ReadPipe(url: PipeConstants.appToHelperPipePath())
-        pipes = HelperPipes(helperToAppPipe: helperToApp, appToHelperPipe: appToHelper)
+        pipes = HelperPipes(writePipe: helperToApp, readPipe: appToHelper)
     }
 
     init(from decoder: any Decoder) throws {
@@ -42,7 +42,7 @@ struct RunCommand: AsyncParsableCommand, Decodable {
         helperId = try container.decode(String.self, forKey: .helperId)
         let helperToApp = try WritePipe(url: PipeConstants.helperToAppPipePath())
         let appToHelper = try ReadPipe(url: PipeConstants.appToHelperPipePath())
-        pipes = HelperPipes(helperToAppPipe: helperToApp, appToHelperPipe: appToHelper)
+        pipes = HelperPipes(writePipe: helperToApp, readPipe: appToHelper)
     }
 
     func run() async throws {
