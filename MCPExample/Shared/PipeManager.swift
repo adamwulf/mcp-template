@@ -47,7 +47,7 @@ public class PipeManager {
     ///   - data: The data to send
     ///   - pipeURL: The URL of the pipe
     /// - Returns: Success status
-    private static func sendData(_ data: Data, to pipeURL: URL) async -> Bool {
+    static func sendData(_ data: Data, to pipeURL: URL) async -> Bool {
         return await withCheckedContinuation { continuation in
             var writePipe: WritePipe?
             do {

@@ -16,27 +16,40 @@ struct MCPHelper: AsyncParsableCommand {
 }
 
 @available(macOS 14.0, *)
-struct RunCommand: AsyncParsableCommand {
+struct RunCommand: AsyncParsableCommand, Decodable {
     static let configuration = CommandConfiguration(
         commandName: "run",
         abstract: "Start the MCP server to handle MCP protocol communications"
     )
 
+    enum CodingKeys: String, CodingKey {
+        case helperId
+    }
+
     // Unique identifier for this helper instance
     private let helperId: String
+    private let pipes: HelperPipes
 
     init() {
         helperId = UUID().uuidString
+        let helperToApp = try! WritePipe(url: PipeConstants.helperToAppPipePath())
+        let appToHelper = try! ReadPipe(url: PipeConstants.appToHelperPipePath())
+        pipes = HelperPipes(helperToAppPipe: helperToApp, appToHelperPipe: appToHelper)
     }
 
-    /// Sends an MCPRequest through the pipe
-    private func sendRequest(_ request: MCPRequest) async {
-        await PipeManager.sendToolRequest(request)
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        helperId = try container.decode(String.self, forKey: .helperId)
+        let helperToApp = try WritePipe(url: PipeConstants.helperToAppPipePath())
+        let appToHelper = try ReadPipe(url: PipeConstants.appToHelperPipePath())
+        pipes = HelperPipes(helperToAppPipe: helperToApp, appToHelperPipe: appToHelper)
     }
 
     func run() async throws {
+        try await pipes.open()
+
         // Send initialize message
-        await sendRequest(.initialize(helperId: helperId))
+        await pipes.sendToolRequest(.initialize(helperId: helperId))
 
         // build server
         let logger = Logger(label: "com.milestonemade.easymcp")
@@ -47,7 +60,7 @@ struct RunCommand: AsyncParsableCommand {
         // Use the new PipeTestHelpers to test pipe functionality
         Task {
             await PipeTestHelpers.testWritePipeAsync(
-                message: "Hello World from mcp-helper through PipeTestHelpers!"
+                message: "Hello World from mcp-helper through PipeTestHelpers!\n"
             )
         }
 
@@ -57,7 +70,7 @@ struct RunCommand: AsyncParsableCommand {
         signalSource.setEventHandler {
             Task {
                 // Send deinitialize message before stopping
-                await self.sendRequest(.deinitialize(helperId: self.helperId))
+                await pipes.sendToolRequest(.deinitialize(helperId: self.helperId))
                 await mcp.stop()
                 RunCommand.exit()
             }
@@ -71,7 +84,7 @@ struct RunCommand: AsyncParsableCommand {
         )) { _ in
             // Send the helloWorld request to the main app
             Task {
-                await self.sendRequest(.helloWorld(helperId: self.helperId, messageId: UUID().uuidString))
+                await pipes.sendToolRequest(.helloWorld(helperId: self.helperId, messageId: UUID().uuidString))
             }
             return Result(content: [.text(helloworld())], isError: false)
         }
@@ -93,7 +106,7 @@ struct RunCommand: AsyncParsableCommand {
             let name = input["name"]?.stringValue ?? "world"
             // Send the helloPerson request to the main app
             Task {
-                await self.sendRequest(.helloPerson(helperId: self.helperId, messageId: UUID().uuidString, name: name))
+                await pipes.sendToolRequest(.helloPerson(helperId: self.helperId, messageId: UUID().uuidString, name: name))
             }
             return Result(content: [.text(hello(name))], isError: false)
         }
@@ -120,7 +133,8 @@ struct RunCommand: AsyncParsableCommand {
         // Wait until the server is finished processing all input
         try await mcp.waitUntilComplete()
 
-        await sendRequest(.deinitialize(helperId: helperId))
+        await pipes.sendToolRequest(.deinitialize(helperId: helperId))
+        try await pipes.close()
     }
 
     /// A simple example method
