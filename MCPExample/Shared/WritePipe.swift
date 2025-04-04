@@ -97,7 +97,6 @@ class WritePipe {
         if fileDescriptor == -1 {
             let errorString = String(cString: strerror(errno))
             Logging.printError("Error opening pipe for writing: \(errorString) (errno: \(errno))")
-            PipeTestHelpers.printPipeStatus(pipePath: fileURL)
             throw WritePipeError.openFailed(errorString)
         }
 

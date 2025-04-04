@@ -5,6 +5,7 @@ public class PipeManager {
     /// Encodes an ExampleTool to JSON and writes it to the helper-to-app pipe
     /// - Parameter tool: The tool to send
     /// - Returns: Success status
+    @discardableResult
     public static func sendToolRequest(_ tool: MCPRequest) async -> Bool {
         do {
             let encoder = JSONEncoder()
@@ -24,6 +25,7 @@ public class PipeManager {
     /// Encodes an ExampleToolResponse to JSON and writes it to the app-to-helper pipe
     /// - Parameter response: The response to send
     /// - Returns: Success status
+    @discardableResult
     public static func sendToolResponse(_ response: MCPResponse) async -> Bool {
         do {
             let encoder = JSONEncoder()

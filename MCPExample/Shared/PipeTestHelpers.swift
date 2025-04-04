@@ -134,16 +134,4 @@ public class PipeTestHelpers {
 
         return result
     }
-
-    /// Prints the status of a pipe to the console for debugging
-    /// - Parameter pipePath: The URL path to the pipe (defaults to the helper-to-app pipe path)
-    public static func printPipeStatus(pipePath: URL = PipeConstants.helperToAppPipePath()) {
-        let status = checkPipeStatus(pipePath: pipePath)
-
-        Logging.printInfo("===== PIPE STATUS =====")
-        for (key, value) in status.sorted(by: { $0.key < $1.key }) {
-            Logging.printInfo("\(key): \(value)")
-        }
-        Logging.printInfo("======================")
-    }
 }

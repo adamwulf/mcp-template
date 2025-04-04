@@ -22,7 +22,22 @@ struct RunCommand: AsyncParsableCommand {
         abstract: "Start the MCP server to handle MCP protocol communications"
     )
 
+    // Unique identifier for this helper instance
+    private let helperId: String
+
+    init() {
+        helperId = UUID().uuidString
+    }
+
+    /// Sends an MCPRequest through the pipe
+    private func sendRequest(_ request: MCPRequest) async {
+        await PipeManager.sendToolRequest(request)
+    }
+
     func run() async throws {
+        // Send initialize message
+        await sendRequest(.initialize(helperId: helperId))
+
         // build server
         let logger = Logger(label: "com.milestonemade.easymcp")
         let mcp = EasyMCP(logger: logger)
@@ -41,6 +56,8 @@ struct RunCommand: AsyncParsableCommand {
         signal(SIGINT, SIG_IGN)
         signalSource.setEventHandler {
             Task {
+                // Send deinitialize message before stopping
+                await self.sendRequest(.deinitialize(helperId: self.helperId))
                 await mcp.stop()
                 RunCommand.exit()
             }
@@ -52,6 +69,10 @@ struct RunCommand: AsyncParsableCommand {
             name: "helloWorld",
             description: "Returns a friendly greeting message"
         )) { _ in
+            // Send the helloWorld request to the main app
+            Task {
+                await self.sendRequest(.helloWorld(helperId: self.helperId, messageId: UUID().uuidString))
+            }
             return Result(content: [.text(helloworld())], isError: false)
         }
 
@@ -69,7 +90,12 @@ struct RunCommand: AsyncParsableCommand {
                 ]
             ]
         )) { input in
-            return Result(content: [.text(hello(input["name"]?.stringValue ?? "world"))], isError: false)
+            let name = input["name"]?.stringValue ?? "world"
+            // Send the helloPerson request to the main app
+            Task {
+                await self.sendRequest(.helloPerson(helperId: self.helperId, messageId: UUID().uuidString, name: name))
+            }
+            return Result(content: [.text(hello(name))], isError: false)
         }
 
         // Start the server and keep it running
@@ -93,6 +119,8 @@ struct RunCommand: AsyncParsableCommand {
 
         // Wait until the server is finished processing all input
         try await mcp.waitUntilComplete()
+
+        await sendRequest(.deinitialize(helperId: helperId))
     }
 
     /// A simple example method

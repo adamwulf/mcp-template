@@ -2,6 +2,11 @@ import Foundation
 
 /// Represents tool requests sent from the helper to the main app
 public enum MCPRequest: Codable {
+
+    case initialize(helperId: String)
+
+    case deinitialize(helperId: String)
+
     /// A tool with no parameters that returns a greeting
     case helloWorld(helperId: String, messageId: String)
 
@@ -11,6 +16,10 @@ public enum MCPRequest: Codable {
     /// Returns the helperId for this tool request
     public var helperId: String {
         switch self {
+        case .initialize(let helperId):
+            return helperId
+        case .deinitialize(let helperId):
+            return helperId
         case .helloWorld(let helperId, _):
             return helperId
         case .helloPerson(let helperId, _, _):
@@ -19,8 +28,10 @@ public enum MCPRequest: Codable {
     }
 
     /// Returns the messageId for this tool request
-    public var messageId: String {
+    public var messageId: String? {
         switch self {
+        case .initialize: return nil
+        case .deinitialize: return nil
         case .helloWorld(_, let messageId):
             return messageId
         case .helloPerson(_, let messageId, _):

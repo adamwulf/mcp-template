@@ -89,7 +89,6 @@ actor ReadPipe {
         guard fileDescriptor != -1 else {
             let errorString = String(cString: strerror(errno))
             Logging.printError("Error opening pipe for reading: \(errorString) (errno: \(errno))")
-            PipeTestHelpers.printPipeStatus(pipePath: fileURL)
             throw ReadPipeError.openFailed(errorString)
         }
 
