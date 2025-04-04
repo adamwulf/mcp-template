@@ -10,7 +10,7 @@ import SwiftUI
 @main
 struct MCPExampleApp: App {
     // Create an app storage object for the app
-    private let pipeReader = PipeReader()
+    private let pipeReader = DebugHelperPipeReader()
 
     init() {
         // Start the pipe reader on app launch
@@ -32,7 +32,7 @@ struct MCPExampleApp: App {
 
 // Separate class to handle pipe reading
 @MainActor
-final class PipeReader: ObservableObject, Sendable {
+final class DebugHelperPipeReader: ObservableObject, Sendable {
     @Published var messages: [String] = []
     @Published var isReading: Bool = false
     @Published var writeStatus: String = ""

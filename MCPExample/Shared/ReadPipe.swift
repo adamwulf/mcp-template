@@ -18,7 +18,7 @@ enum ReadPipeError: Error {
 }
 
 /// A class for creating and reading from a named pipe (FIFO)
-actor ReadPipe {
+actor ReadPipe: PipeReadable {
     private let fileURL: URL
     private var fileHandle: FileHandle?
 
@@ -73,7 +73,7 @@ actor ReadPipe {
 
     /// Opens the pipe for reading without blocking on open, but allowing blocking reads
     /// - Throws: ReadPipeError if opening fails
-    func open() throws {
+    func open() async throws {
         // Make sure the path exists and is a pipe
         let pipePath = fileURL.path
         guard FileManager.default.fileExists(atPath: pipePath) else {
@@ -138,7 +138,7 @@ actor ReadPipe {
     }
 
     /// Closes the pipe
-    func close() {
+    func close() async {
         try? fileHandle?.close()
         fileHandle = nil
     }

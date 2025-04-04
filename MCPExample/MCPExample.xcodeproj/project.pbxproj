@@ -24,6 +24,16 @@
 		C57BCA122D9F3EE000D817AD /* MCPRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = C57BCA0D2D9F3EE000D817AD /* MCPRequest.swift */; };
 		C57BCA132D9F3EE000D817AD /* MCPResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = C57BCA0E2D9F3EE000D817AD /* MCPResponse.swift */; };
 		C57BCA152D9F3EE000D817AD /* MCPRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = C57BCA0D2D9F3EE000D817AD /* MCPRequest.swift */; };
+		C57BCA432DA05EA900D817AD /* MCPResponseReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = C57BCA3E2DA05EA900D817AD /* MCPResponseReader.swift */; };
+		C57BCA442DA05EA900D817AD /* MCPTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = C57BCA3F2DA05EA900D817AD /* MCPTools.swift */; };
+		C57BCA452DA05EA900D817AD /* PipeProtocols.swift in Sources */ = {isa = PBXBuildFile; fileRef = C57BCA412DA05EA900D817AD /* PipeProtocols.swift */; };
+		C57BCA462DA05EA900D817AD /* ResponseManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C57BCA422DA05EA900D817AD /* ResponseManager.swift */; };
+		C57BCA472DA05EA900D817AD /* MockPipe.swift in Sources */ = {isa = PBXBuildFile; fileRef = C57BCA402DA05EA900D817AD /* MockPipe.swift */; };
+		C57BCA482DA05EA900D817AD /* MCPResponseReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = C57BCA3E2DA05EA900D817AD /* MCPResponseReader.swift */; };
+		C57BCA492DA05EA900D817AD /* MCPTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = C57BCA3F2DA05EA900D817AD /* MCPTools.swift */; };
+		C57BCA4A2DA05EA900D817AD /* PipeProtocols.swift in Sources */ = {isa = PBXBuildFile; fileRef = C57BCA412DA05EA900D817AD /* PipeProtocols.swift */; };
+		C57BCA4B2DA05EA900D817AD /* ResponseManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C57BCA422DA05EA900D817AD /* ResponseManager.swift */; };
+		C57BCA4C2DA05EA900D817AD /* MockPipe.swift in Sources */ = {isa = PBXBuildFile; fileRef = C57BCA402DA05EA900D817AD /* MockPipe.swift */; };
 		C5F326F92D87DC25000D77C6 /* ArgumentParser in Frameworks */ = {isa = PBXBuildFile; productRef = C5F326F82D87DC25000D77C6 /* ArgumentParser */; };
 		C5F326FC2D87DC41000D77C6 /* EasyMCP in Frameworks */ = {isa = PBXBuildFile; productRef = C5F326FB2D87DC41000D77C6 /* EasyMCP */; };
 /* End PBXBuildFile section */
@@ -73,6 +83,11 @@
 		C57BC9CE2D9DDE8900D817AD /* PipeTestHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipeTestHelpers.swift; sourceTree = "<group>"; };
 		C57BCA0D2D9F3EE000D817AD /* MCPRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPRequest.swift; sourceTree = "<group>"; };
 		C57BCA0E2D9F3EE000D817AD /* MCPResponse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPResponse.swift; sourceTree = "<group>"; };
+		C57BCA3E2DA05EA900D817AD /* MCPResponseReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPResponseReader.swift; sourceTree = "<group>"; };
+		C57BCA3F2DA05EA900D817AD /* MCPTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPTools.swift; sourceTree = "<group>"; };
+		C57BCA402DA05EA900D817AD /* MockPipe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockPipe.swift; sourceTree = "<group>"; };
+		C57BCA412DA05EA900D817AD /* PipeProtocols.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipeProtocols.swift; sourceTree = "<group>"; };
+		C57BCA422DA05EA900D817AD /* ResponseManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResponseManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -138,6 +153,11 @@
 		C57BC9BE2D9DD3B100D817AD /* Shared */ = {
 			isa = PBXGroup;
 			children = (
+				C57BCA3E2DA05EA900D817AD /* MCPResponseReader.swift */,
+				C57BCA3F2DA05EA900D817AD /* MCPTools.swift */,
+				C57BCA402DA05EA900D817AD /* MockPipe.swift */,
+				C57BCA412DA05EA900D817AD /* PipeProtocols.swift */,
+				C57BCA422DA05EA900D817AD /* ResponseManager.swift */,
 				C57BC9CE2D9DDE8900D817AD /* PipeTestHelpers.swift */,
 				C57BCA0D2D9F3EE000D817AD /* MCPRequest.swift */,
 				C57BCA0E2D9F3EE000D817AD /* MCPResponse.swift */,
@@ -323,6 +343,11 @@
 			files = (
 				C57BC9D02D9DDE8900D817AD /* PipeTestHelpers.swift in Sources */,
 				C57BC9C32D9DD54600D817AD /* ReadPipe.swift in Sources */,
+				C57BCA432DA05EA900D817AD /* MCPResponseReader.swift in Sources */,
+				C57BCA442DA05EA900D817AD /* MCPTools.swift in Sources */,
+				C57BCA452DA05EA900D817AD /* PipeProtocols.swift in Sources */,
+				C57BCA462DA05EA900D817AD /* ResponseManager.swift in Sources */,
+				C57BCA472DA05EA900D817AD /* MockPipe.swift in Sources */,
 				C57BC9C72D9DD6D100D817AD /* FileManager+Pipe.swift in Sources */,
 				C57BC9C82D9DD6D100D817AD /* Logging.swift in Sources */,
 				C57BC9C42D9DD54600D817AD /* WritePipe.swift in Sources */,
@@ -338,6 +363,11 @@
 			files = (
 				C57BCA102D9F3EE000D817AD /* MCPResponse.swift in Sources */,
 				C57BCA122D9F3EE000D817AD /* MCPRequest.swift in Sources */,
+				C57BCA482DA05EA900D817AD /* MCPResponseReader.swift in Sources */,
+				C57BCA492DA05EA900D817AD /* MCPTools.swift in Sources */,
+				C57BCA4A2DA05EA900D817AD /* PipeProtocols.swift in Sources */,
+				C57BCA4B2DA05EA900D817AD /* ResponseManager.swift in Sources */,
+				C57BCA4C2DA05EA900D817AD /* MockPipe.swift in Sources */,
 				C57BC9C92D9DD6D100D817AD /* FileManager+Pipe.swift in Sources */,
 				C57BC9CF2D9DDE8900D817AD /* PipeTestHelpers.swift in Sources */,
 				C57BC9CA2D9DD6D100D817AD /* Logging.swift in Sources */,

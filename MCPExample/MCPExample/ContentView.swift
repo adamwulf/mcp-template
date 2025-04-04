@@ -9,7 +9,7 @@ import SwiftUI
 
 struct ContentView: View {
     @State private var helperPath: String = ""
-    @EnvironmentObject private var pipeReader: PipeReader
+    @EnvironmentObject private var pipeReader: DebugHelperPipeReader
 
     var body: some View {
         VStack(spacing: 16) {

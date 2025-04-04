@@ -16,7 +16,7 @@ enum WritePipeError: Error {
 }
 
 /// A class for creating and writing to a named pipe (FIFO)
-class WritePipe {
+actor WritePipe: PipeWritable {
     private let fileURL: URL
     private var fileHandle: FileHandle?
 
@@ -36,12 +36,13 @@ class WritePipe {
     }
 
     deinit {
-        close()
+        try? fileHandle?.close()
+        fileHandle = nil
     }
 
     /// Creates the named pipe at the specified URL
     /// - Throws: WritePipeError if creation fails
-    private func createPipe() throws {
+    nonisolated private func createPipe() throws {
         let pipePath = fileURL.path
         let fileManager = FileManager.default
 
@@ -142,7 +143,7 @@ class WritePipe {
     /// Writes a string to the pipe (converts to UTF8 data)
     /// - Parameter string: The string to write
     /// - Throws: WritePipeError if writing fails
-    func write(_ string: String) throws {
+    public func write(_ string: String) throws {
         try write(Data(string.utf8))
     }
 

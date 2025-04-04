@@ -24,12 +24,12 @@ actor HelperPipes {
     }
 
     public func open() async throws {
-        try writePipe.open()
+        try await writePipe.open()
         try await readPipe.open()
     }
 
     public func close() async throws {
-        writePipe.close()
+        await writePipe.close()
         await readPipe.close()
     }
 
@@ -48,7 +48,7 @@ actor HelperPipes {
         data.append(10) // newline character
 
         do {
-            try writePipe.write(data)
+            try await writePipe.write(data)
         } catch {
             Logging.printError("Error encoding tool: \(error)")
             throw Error.sendError(error)

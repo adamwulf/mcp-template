@@ -11,9 +11,8 @@ public class PipeTestHelpers {
     /// - Returns: Boolean indicating success
     public static func testWritePipe(
         message: String,
-        pipePath: URL,
-        completion: ((Bool) -> Void)? = nil
-    ) {
+        pipePath: URL
+    ) async -> Bool {
         var writePipe: WritePipe?
         do {
             // Create a write pipe
@@ -21,18 +20,18 @@ public class PipeTestHelpers {
             writePipe = pipe
 
             // Open the pipe for writing
-            try pipe.open()
+            try await pipe.open()
 
             // Write test message to the pipe
-            try pipe.write(message)
+            try await pipe.write(message)
 
             // Close the pipe
-            pipe.close()
+            await pipe.close()
 
-            completion?(true)
+            return true
         } catch {
-            writePipe?.close()
-            completion?(false)
+            await writePipe?.close()
+            return false
         }
     }
 
@@ -46,11 +45,7 @@ public class PipeTestHelpers {
         message: String = "Hello World from PipeTestHelpers!",
         pipePath: URL = PipeConstants.helperToAppPipePath()
     ) async -> Bool {
-        return await withCheckedContinuation { continuation in
-            testWritePipe(message: message, pipePath: pipePath) { success in
-                continuation.resume(returning: success)
-            }
-        }
+        return await testWritePipe(message: message, pipePath: pipePath)
     }
 
     /// Checks the status of a pipe file and returns diagnostic information
