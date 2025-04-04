@@ -57,31 +57,28 @@ final class PipeReader: ObservableObject, Sendable {
                 readPipe = pipe
 
                 // Open the pipe for reading
-                try pipe.open()
+                try await pipe.open()
 
                 // Get a local copy of isReading to avoid constantly checking across actor boundaries
                 var shouldContinueReading = await self.isReading
 
                 // Continuously read from the pipe while isReading is true
                 while shouldContinueReading && !Task.isCancelled {
-                    let message = try pipe.readString()
-
-                    // Update UI state on the main actor
-                    await MainActor.run {
-                        self.messages.append(message)
-                        messageHandler(message)
+                    if let message = try await pipe.readLine() {
+                        // Update UI state on the main actor
+                        await MainActor.run {
+                            self.messages.append(message)
+                            messageHandler(message)
+                        }
                     }
-
-                    // Add a small delay to avoid tight loop
-                    try? await Task.sleep(for: .milliseconds(100))
 
                     // Check if we should continue reading
                     shouldContinueReading = await self.isReading
                 }
 
-                pipe.close()
+                await pipe.close()
             } catch {
-                readPipe?.close()
+                await readPipe?.close()
 
                 // Update UI state on the main actor
                 await MainActor.run {

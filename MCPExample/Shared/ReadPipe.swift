@@ -13,11 +13,12 @@ enum ReadPipeError: Error {
     case setFlagsFailed(String)
     case pipeNotOpened
     case readError(Error)
+    case eof
     case stringEncodingError
 }
 
 /// A class for creating and reading from a named pipe (FIFO)
-class ReadPipe {
+actor ReadPipe {
     private let fileURL: URL
     private var fileHandle: FileHandle?
 
@@ -32,16 +33,6 @@ class ReadPipe {
         self.fileURL = url
 
         // Create the pipe
-        try createPipe()
-    }
-
-    deinit {
-        close()
-    }
-
-    /// Creates the named pipe at the specified URL
-    /// - Throws: ReadPipeError if creation fails
-    private func createPipe() throws {
         let pipePath = fileURL.path
         let fileManager = FileManager.default
 
@@ -72,6 +63,11 @@ class ReadPipe {
         guard fileManager.isPipe(at: fileURL) else {
             throw ReadPipeError.notAPipe
         }
+    }
+
+    deinit {
+        try? fileHandle?.close()
+        fileHandle = nil
     }
 
     /// Opens the pipe for reading without blocking on open, but allowing blocking reads
@@ -117,43 +113,26 @@ class ReadPipe {
         fileHandle = FileHandle(fileDescriptor: fileDescriptor, closeOnDealloc: true)
     }
 
-    /// Reads data from the pipe (blocking)
-    /// - Returns: Data read from the pipe
+    /// Reads a single line from the pipe (blocking until line is available)
+    /// - Returns: A single line as a string, or nil if the stream ends
     /// - Throws: ReadPipeError if reading fails
-    func read() throws -> Data {
-        assert(!Thread.isMainThread, "do not read on the main thread")
+    func readLine() async throws -> String? {
         guard let fileHandle = fileHandle else {
             Logging.printError("Error: Pipe not opened")
             throw ReadPipeError.pipeNotOpened
         }
 
         do {
-            // This will block until data is available
-            while true {
-                if let data = try fileHandle.readToEnd() {
-                    return data
-                }
-                // Add a small delay to prevent tight loop
-                Thread.sleep(forTimeInterval: 0.1) // 100ms delay
+            // Get the first line from the async sequence
+            for try await line in fileHandle.bytes.lines {
+                return line
             }
+            // If we get here, the sequence was empty
+            return nil
         } catch {
-            Logging.printError("Error reading from pipe", error: error)
+            Logging.printError("Error reading line from pipe", error: error)
             throw ReadPipeError.readError(error)
         }
-    }
-
-    /// Reads data from the pipe and converts it to a string
-    /// - Returns: String read from the pipe
-    /// - Throws: ReadPipeError if reading or string conversion fails
-    func readString() throws -> String {
-        assert(!Thread.isMainThread, "do not read on the main thread")
-        let data = try read()
-
-        guard let string = String(data: data, encoding: .utf8) else {
-            throw ReadPipeError.stringEncodingError
-        }
-
-        return string
     }
 
     /// Closes the pipe

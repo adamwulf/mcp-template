@@ -87,17 +87,9 @@ public class PipeManager {
     /// - Parameter pipe: The ReadPipe to use
     /// - Returns: The data read from the pipe
     private static func readDataFrom(_ pipe: ReadPipe) async throws -> Data {
-        return try await withCheckedThrowingContinuation { continuation in
-            do {
-                let string = try pipe.readString()
-                if let data = string.data(using: .utf8) {
-                    continuation.resume(returning: data)
-                } else {
-                    continuation.resume(throwing: ReadPipeError.stringEncodingError)
-                }
-            } catch {
-                continuation.resume(throwing: error)
-            }
+        guard let string = try await pipe.readLine() else {
+            throw ReadPipeError.eof
         }
+        return Data(string.utf8)
     }
 }
