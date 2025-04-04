@@ -67,7 +67,7 @@ final class PipeReader: ObservableObject, Sendable {
                     if let message = try await pipe.readLine() {
                         // Update UI state on the main actor
                         await MainActor.run {
-                            self.messages.append(message)
+                            self.messages.append("\(self.messages.count + 1): " + message)
                             messageHandler(message)
                         }
                     }

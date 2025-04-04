@@ -23,7 +23,8 @@ actor ReadPipe {
     private var fileHandle: FileHandle?
 
     /// Initialize with a URL that represents where the pipe should be created
-    /// - Parameter url: A file URL where the pipe should be created
+    /// - Parameters:
+    ///   - url: A file URL where the pipe should be created
     /// - Throws: ReadPipeError if initialization fails
     init(url: URL) throws {
         guard url.isFileURL else {
@@ -101,8 +102,9 @@ actor ReadPipe {
             throw ReadPipeError.getFlagsFailed(errorString)
         }
 
-        // Set flags - check for error
-        let result = fcntl(fileDescriptor, F_SETFL, flags & ~O_NONBLOCK)
+        // Set flags based on blocking preference
+        let newFlags: Int32 = flags & ~O_NONBLOCK
+        let result = fcntl(fileDescriptor, F_SETFL, newFlags)
         if result == -1 {
             let errorString = String(cString: strerror(errno))
             Logging.printError("Error setting file descriptor flags: \(errorString)")
@@ -113,8 +115,8 @@ actor ReadPipe {
         fileHandle = FileHandle(fileDescriptor: fileDescriptor, closeOnDealloc: true)
     }
 
-    /// Reads a single line from the pipe (blocking until line is available)
-    /// - Returns: A single line as a string, or nil if the stream ends
+    /// Reads a single line from the pipe
+    /// - Returns: A single line as a string, or nil if the stream ends or no data available in non-blocking mode
     /// - Throws: ReadPipeError if reading fails
     func readLine() async throws -> String? {
         guard let fileHandle = fileHandle else {
@@ -123,13 +125,14 @@ actor ReadPipe {
         }
 
         do {
-            // Get the first line from the async sequence
+            // In non-blocking mode, this may return immediately if no data is available
             for try await line in fileHandle.bytes.lines {
                 return line
             }
-            // If we get here, the sequence was empty
+            // If we get here, the sequence was empty (EOF or no data in non-blocking mode)
             return nil
         } catch {
+            // In non-blocking mode, check for specific errors like EAGAIN/EWOULDBLOCK            
             Logging.printError("Error reading line from pipe", error: error)
             throw ReadPipeError.readError(error)
         }
