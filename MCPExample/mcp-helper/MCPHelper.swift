@@ -30,12 +30,13 @@ struct RunCommand: AsyncParsableCommand, Decodable {
     // Unique identifier for this helper instance
     private let helperId: String
     private let pipes: HelperPipes
+    private let logger = Logger(label: "com.milestonemade.easymcp")
 
     init() {
         helperId = UUID().uuidString
         let helperToApp = try! WritePipe(url: PipeConstants.helperToAppPipePath())
         let appToHelper = try! ReadPipe(url: PipeConstants.appToHelperPipePath())
-        pipes = HelperPipes(writePipe: helperToApp, readPipe: appToHelper)
+        pipes = HelperPipes(writePipe: helperToApp, readPipe: appToHelper, logger: logger)
     }
 
     init(from decoder: any Decoder) throws {
@@ -43,7 +44,7 @@ struct RunCommand: AsyncParsableCommand, Decodable {
         helperId = try container.decode(String.self, forKey: .helperId)
         let helperToApp = try WritePipe(url: PipeConstants.helperToAppPipePath())
         let appToHelper = try ReadPipe(url: PipeConstants.appToHelperPipePath())
-        pipes = HelperPipes(writePipe: helperToApp, readPipe: appToHelper)
+        pipes = HelperPipes(writePipe: helperToApp, readPipe: appToHelper, logger: logger)
     }
 
     func run() async throws {
@@ -53,7 +54,6 @@ struct RunCommand: AsyncParsableCommand, Decodable {
         try await pipes.sendToolRequest(.initialize(helperId: helperId))
 
         // build server
-        let logger = Logger(label: "com.milestonemade.easymcp")
         let mcp = EasyMCP(logger: logger)
 
         #if DEBUG

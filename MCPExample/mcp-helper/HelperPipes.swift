@@ -6,6 +6,7 @@
 //
 import Foundation
 import EasyMacMCP
+import Logging
 
 actor HelperPipes {
 
@@ -18,10 +19,12 @@ actor HelperPipes {
 
     let writePipe: WritePipe
     let readPipe: ReadPipe
+    private let logger: Logger?
 
-    init(writePipe: WritePipe, readPipe: ReadPipe) {
+    init(writePipe: WritePipe, readPipe: ReadPipe, logger: Logger? = nil) {
         self.writePipe = writePipe
         self.readPipe = readPipe
+        self.logger = logger
     }
 
     public func open() async throws {
@@ -40,7 +43,7 @@ actor HelperPipes {
         do {
             jsonData = try encoder.encode(tool)
         } catch {
-            Logging.printError("Error encoding tool: \(error)")
+            logger?.error("Error encoding tool: \(error.localizedDescription)")
             throw Error.encodeError(error)
         }
 
@@ -51,7 +54,7 @@ actor HelperPipes {
         do {
             try await writePipe.write(data)
         } catch {
-            Logging.printError("Error encoding tool: \(error)")
+            logger?.error("Error sending tool request: \(error.localizedDescription)")
             throw Error.sendError(error)
         }
     }
@@ -67,7 +70,7 @@ actor HelperPipes {
             let decoder = JSONDecoder()
             return try decoder.decode(MCPResponse.self, from: Data(string.utf8))
         } catch {
-            Logging.printError("Error reading response: \(error)")
+            logger?.error("Error reading response: \(error.localizedDescription)")
             throw Error.readError(error)
         }
     }
