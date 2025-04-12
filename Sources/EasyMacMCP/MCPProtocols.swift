@@ -11,6 +11,15 @@ public protocol MCPRequestProtocol: Codable, Sendable, CaseIterable {
 
     /// Returns the tool metadata for this specific request case
     var toolMetadata: ToolMetadata? { get }
+
+    /// Initialize a request from MCP call parameters
+    /// - Parameters:
+    ///   - helperId: The helper ID for the request
+    ///   - messageId: A unique message ID for this request
+    ///   - parameters: The MCP call parameters
+    /// - Returns: An initialized request
+    /// - Throws: Error if the parameters are invalid or can't be converted
+    static func create(helperId: String, messageId: String, parameters: MCP.CallTool.Parameters) throws -> Self
 }
 
 /// Metadata for MCP tools

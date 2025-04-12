@@ -43,27 +43,22 @@ public final class EasyMacMCP<Request: MCPRequestProtocol, Response: MCPResponse
     private var responseReaderTask: Task<Void, Never>?
     // Tools with handlers
     private var tools: [String: ToolRegistration] = [:]
-    // Request builder
-    private let requestBuilder: (String, String, [String: Value], String) throws -> Request
 
     /// Initializes a new EasyMacMCP instance
     /// - Parameters:
     ///   - helperId: The unique ID for this helper
     ///   - requestPipe: The pipe to write requests to
     ///   - responsePipe: The pipe to read responses from
-    ///   - requestBuilder: A function that builds a Request from helperId, messageId, arguments, and toolName
     ///   - logger: Optional logger for diagnostics
     public init(
         helperId: String,
         requestPipe: HelperRequestPipe,
         responsePipe: HelperResponsePipe,
-        requestBuilder: @escaping (String, String, [String: Value], String) throws -> Request,
         logger: Logger? = nil
     ) {
         self.helperId = helperId
         self.requestPipe = requestPipe
         self.responsePipe = responsePipe
-        self.requestBuilder = requestBuilder
         self.logger = logger
         self.responseManager = ResponseManager()
 
@@ -227,12 +222,11 @@ public final class EasyMacMCP<Request: MCPRequestProtocol, Response: MCPResponse
                     // Generate a message ID for this request
                     let messageId = UUID().uuidString
 
-                    // Create a request using the provided builder and the tool name
-                    let request = try self.requestBuilder(
-                        self.helperId,
-                        messageId,
-                        params.arguments ?? [:],
-                        toolNameCopy
+                    // Create a request using the Request.create static method
+                    let request = try Request.create(
+                        helperId: self.helperId,
+                        messageId: messageId,
+                        parameters: params
                     )
 
                     // Send the request through the pipe

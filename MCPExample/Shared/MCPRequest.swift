@@ -82,8 +82,31 @@ public enum MCPRequest: MCPRequestProtocol {
     /// List of all available cases for CaseIterable conformance
     public static var allCases: [MCPRequest] {
         return [
+            .initialize(helperId: "placeholder"),
+            .deinitialize(helperId: "placeholder"),
             .helloWorld(helperId: "placeholder", messageId: "placeholder"),
             .helloPerson(helperId: "placeholder", messageId: "placeholder", name: "placeholder")
         ]
+    }
+
+    /// Create a request from MCP call parameters
+    /// - Parameters:
+    ///   - helperId: The helper ID for the request
+    ///   - messageId: A unique message ID for this request
+    ///   - parameters: The MCP call parameters
+    /// - Returns: An initialized request
+    /// - Throws: Error if the parameters are invalid or can't be converted
+    public static func create(helperId: String, messageId: String, parameters: MCP.CallTool.Parameters) throws -> MCPRequest {
+        switch parameters.name {
+        case "mcp_mcpexample_helloWorld":
+            return .helloWorld(helperId: helperId, messageId: messageId)
+
+        case "mcp_mcpexample_helloPerson":
+            let name = parameters.arguments?["name"]?.stringValue ?? "Anonymous"
+            return .helloPerson(helperId: helperId, messageId: messageId, name: name)
+
+        default:
+            throw NSError(domain: "MCPRequest", code: 1, userInfo: [NSLocalizedDescriptionKey: "Unknown tool: \(parameters.name)"])
+        }
     }
 }
