@@ -1,4 +1,5 @@
 import Foundation
+@testable import EasyMacMCP
 
 /// A mock implementation of PipeReadable for testing
 public actor MockPipeReader: PipeReadable {
