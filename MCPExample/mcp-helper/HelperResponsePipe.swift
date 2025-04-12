@@ -1,5 +1,5 @@
 //
-//  ResponsePipe.swift
+//  HelperResponsePipe.swift
 //  MCPExample
 //
 //  Created by Adam Wulf on 4/6/25.
@@ -10,7 +10,7 @@ import EasyMacMCP
 import Logging
 
 /// Actor that wraps a ReadPipe for receiving responses from the Mac app
-actor ResponsePipe {
+actor HelperResponsePipe {
     enum Error: Swift.Error {
         case decodeError(_ error: Swift.Error)
         case readError(_ error: Swift.Error)

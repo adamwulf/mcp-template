@@ -32,18 +32,18 @@ struct RunCommand: AsyncParsableCommand, Decodable {
     private let logger = Logger(label: "com.milestonemade.easymcp")
 
     // Pipe for sending requests to the Mac app
-    private var requestPipe: RequestPipe
+    private var requestPipe: HelperRequestPipe
 
     // Pipe for receiving responses from the Mac app
-    private var responsePipe: ResponsePipe
+    private var responsePipe: HelperResponsePipe
 
     init() {
         helperId = UUID().uuidString
-        requestPipe = try! RequestPipe(
+        requestPipe = try! HelperRequestPipe(
             url: PipeConstants.centralRequestPipePath(),
             logger: logger
         )
-        responsePipe = try! ResponsePipe(
+        responsePipe = try! HelperResponsePipe(
             url: PipeConstants.helperResponsePipePath(helperId: helperId),
             logger: logger
         )
@@ -52,11 +52,11 @@ struct RunCommand: AsyncParsableCommand, Decodable {
     init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         helperId = try container.decode(String.self, forKey: .helperId)
-        requestPipe = try RequestPipe(
+        requestPipe = try HelperRequestPipe(
             url: PipeConstants.centralRequestPipePath(),
             logger: logger
         )
-        responsePipe = try ResponsePipe(
+        responsePipe = try HelperResponsePipe(
             url: PipeConstants.helperResponsePipePath(helperId: helperId),
             logger: logger
         )
@@ -65,7 +65,6 @@ struct RunCommand: AsyncParsableCommand, Decodable {
     func run() async throws {
         // Create pipes
         do {
-
             // Open pipes
             try await requestPipe.open()
             try await responsePipe.open()

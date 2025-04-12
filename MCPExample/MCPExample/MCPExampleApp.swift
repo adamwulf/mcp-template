@@ -7,106 +7,169 @@
 
 import SwiftUI
 import EasyMacMCP
+import Logging
 
 @main
 struct MCPExampleApp: App {
-    // Create an app storage object for the app
-    private let pipeReader = DebugHelperPipeReader()
+    // Create the actor that will manage MCP communication
+    private let mcpApp = MCPMacApp()
 
     init() {
-        // Start the pipe reader on app launch
-        pipeReader.startReading { message in
-            // We receive messages through the closure
-            DispatchQueue.main.async {
-                print("Pipe message received: \(message)")
-            }
-        }
+        // Start listening for MCP requests on app launch
+        mcpApp.startListening()
     }
 
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .environmentObject(pipeReader)
+                .environmentObject(mcpApp)
         }
     }
 }
 
-// Separate class to handle pipe reading
+// Actor to handle all MCP communication
 @MainActor
-final class DebugHelperPipeReader: ObservableObject, Sendable {
+final class MCPMacApp: ObservableObject, Sendable {
     @Published var messages: [String] = []
-    @Published var isReading: Bool = false
     @Published var writeStatus: String = ""
+    
+    // Maps helper IDs to their respective response pipes
+    private var responsePipes: [String: HostResponsePipe] = [:]
+    private var requestPipe: HostRequestPipe?
+    private var requestReadTask: Task<Void, Never>?
+    private let logger = Logger(label: "MCPMacApp")
 
-    private var pipeReadTask: Task<Void, Never>?
-
-    func startReading(messageHandler: @escaping (String) -> Void) {
-        guard !isReading else { return }
-
-        isReading = true
-
-        let pipePath = PipeConstants.helperToAppPipePath()
-
-        // Use Task.detached to run the pipe reading off the main actor
-        pipeReadTask = Task.detached { [weak self] in
-            guard let self = self else { return }
-
-            var readPipe: ReadPipe?
+    func startListening() {
+        guard requestPipe == nil else { return }
+        
+        Task {
             do {
-                // Create a read pipe
-                let pipe = try ReadPipe(url: pipePath)
-                readPipe = pipe
-
-                // Open the pipe for reading
+                // Get the central request pipe path
+                let requestPipePath = PipeConstants.centralRequestPipePath()
+                
+                // Create a request pipe for reading from helpers
+                let pipe = try HostRequestPipe(url: requestPipePath, logger: logger)
+                self.requestPipe = pipe
+                
+                print("Opening request pipe at: \(requestPipePath.path)")
                 try await pipe.open()
-
-                // Get a local copy of isReading to avoid constantly checking across actor boundaries
-                var shouldContinueReading = await self.isReading
-
-                // Continuously read from the pipe while isReading is true
-                while shouldContinueReading && !Task.isCancelled {
-                    if let message = try await pipe.readLine() {
-                        // Update UI state on the main actor
-                        await MainActor.run {
-                            self.messages.append("\(self.messages.count + 1): " + message)
-                            messageHandler(message)
-                        }
-                    }
-
-                    // Check if we should continue reading
-                    shouldContinueReading = await self.isReading
+                print("Request pipe opened successfully")
+                
+                // Start reading requests
+                await pipe.startReading { [weak self] request in
+                    self?.handleRequest(request)
                 }
-
-                await pipe.close()
             } catch {
-                await readPipe?.close()
-
-                // Update UI state on the main actor
-                await MainActor.run {
-                    self.isReading = false
+                print("Error setting up request pipe: \(error)")
+            }
+        }
+    }
+    
+    private func handleRequest(_ request: MCPRequest) {
+        // Extract helper ID from the request
+        let helperId = request.helperId
+        
+        // Update the UI
+        let requestDescription: String
+        switch request {
+        case .initialize:
+            requestDescription = "Initialize request from helper: \(helperId)"
+        case .deinitialize:
+            requestDescription = "Deinitialize request from helper: \(helperId)"
+        case .helloWorld:
+            requestDescription = "HelloWorld request from helper: \(helperId)"
+        case .helloPerson(_, _, let name):
+            requestDescription = "HelloPerson request from helper: \(helperId) with name: \(name)"
+        }
+        
+        self.messages.append(requestDescription)
+        print(requestDescription)
+        
+        // Setup response pipe for this helper if needed
+        setupResponsePipe(for: helperId)
+    }
+    
+    private func setupResponsePipe(for helperId: String) {
+        // Only create a new response pipe if we don't already have one for this helper
+        if responsePipes[helperId] == nil {
+            Task {
+                do {
+                    print("Setting up response pipe for helper \(helperId)")
+                    
+                    // Create the response pipe for this specific helper
+                    let responsePipe = try HostResponsePipe(helperId: helperId, logger: logger)
+                    
+                    // Open the pipe
+                    try await responsePipe.open()
+                    
+                    // Store it in our dictionary
+                    responsePipes[helperId] = responsePipe
+                    
+                    print("Response pipe for helper \(helperId) created successfully")
+                    
+                    // If this is an initialize request, we could send a response here
+                    // await responsePipe.sendResponse(MCPResponse.success(helperId: helperId, ...))
+                } catch {
+                    print("Error creating response pipe for helper \(helperId): \(error)")
                 }
             }
         }
     }
-
-    func stopReading() {
-        isReading = false
-        pipeReadTask?.cancel()
-        pipeReadTask = nil
-    }
-
-    func testWriteToPipe() {
+    
+    func stopListening() {
+        // Cancel the request reading task
         Task {
-            writeStatus = "Writing to pipe..."
-            let success = await PipeTestHelpers.testWritePipeAsync(
-                message: "Test message from MCPExampleApp!",
-                pipePath: PipeConstants.appToHelperPipePath()
-            )
-            writeStatus = success ? "Write successful!" : "Write failed!"
-
-            // Clear status after a delay
-            try? await Task.sleep(for: .seconds(2))
-            writeStatus = ""
+            await requestPipe?.close()
+            requestPipe = nil
+        }
+        
+        // Close all response pipes
+        for (helperId, pipe) in responsePipes {
+            Task {
+                print("Closing response pipe for helper \(helperId)")
+                await pipe.close()
+            }
+        }
+        responsePipes.removeAll()
+    }
+    
+    func testWriteToPipe() {
+        // Clear previous status
+        writeStatus = "Sending test message..."
+        
+        // Check if we have any helpers connected
+        guard !responsePipes.isEmpty else {
+            writeStatus = "No helpers connected. Launch mcp-helper first."
+            return
+        }
+        
+        // Pick the first helper or a random one
+        let randomHelperId = responsePipes.keys.randomElement()!
+        
+        Task {
+            do {
+                // Create a test response
+                let messageId = UUID().uuidString
+                let response = MCPResponse.helloWorld(
+                    helperId: randomHelperId,
+                    messageId: messageId,
+                    result: "Test message from Mac app at \(Date())"
+                )
+                
+                // Send the response
+                try await responsePipes[randomHelperId]?.sendResponse(response)
+                
+                // Update status on success
+                DispatchQueue.main.async {
+                    self.writeStatus = "Message sent successfully to helper: \(randomHelperId)"
+                    self.messages.append("Sent helloWorld to \(randomHelperId)")
+                }
+            } catch {
+                // Update status on failure
+                DispatchQueue.main.async {
+                    self.writeStatus = "Error: \(error.localizedDescription)"
+                }
+            }
         }
     }
 }

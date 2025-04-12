@@ -1,6 +1,6 @@
 import XCTest
 @testable import EasyMCP
-@testable import MCPExample
+@testable import EasyMacMCP
 
 final class ResponseManagerTests: XCTestCase {
     var responseManager: ResponseManager!

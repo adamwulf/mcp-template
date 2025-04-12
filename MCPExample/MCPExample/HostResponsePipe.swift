@@ -1,5 +1,5 @@
 //
-//  RequestPipe.swift
+//  HostResponsePipe.swift
 //  MCPExample
 //
 //  Created by Adam Wulf on 4/6/25.
@@ -9,23 +9,27 @@ import Foundation
 import EasyMacMCP
 import Logging
 
-/// Actor that wraps a WritePipe for sending requests from helpers to the Mac app
-actor RequestPipe {
+/// Actor that wraps a WritePipe for sending responses from the Mac app to a specific MCP helper
+actor HostResponsePipe {
     enum Error: Swift.Error {
         case encodeError(_ error: Swift.Error)
         case sendError(_ error: Swift.Error)
     }
 
+    let helperId: String
     private let writePipe: WritePipe
     private let logger: Logger?
 
-    /// Initialize with a pipe URL
+    /// Initialize with the helper ID and response pipe URL
     /// - Parameters:
-    ///   - url: URL to the central request pipe
+    ///   - helperId: The unique identifier for the MCP helper
     ///   - logger: Optional logger for debugging
-    init(url: URL, logger: Logger? = nil) throws {
-        self.writePipe = try WritePipe(url: url)
+    init(helperId: String, logger: Logger? = nil) throws {
+        self.helperId = helperId
         self.logger = logger
+        
+        let url = PipeConstants.helperResponsePipePath(helperId: helperId)
+        self.writePipe = try WritePipe(url: url)
     }
 
     /// Open the pipe for writing
@@ -38,16 +42,16 @@ actor RequestPipe {
         await writePipe.close()
     }
 
-    /// Send a request to the Mac app
-    /// - Parameter request: The MCPRequest to send
-    func sendRequest(_ request: MCPRequest) async throws {
+    /// Send a response to the helper
+    /// - Parameter response: The MCPResponse to send
+    func sendResponse(_ response: MCPResponse) async throws {
         let encoder = JSONEncoder()
         let jsonData: Data
 
         do {
-            jsonData = try encoder.encode(request)
+            jsonData = try encoder.encode(response)
         } catch {
-            logger?.error("Error encoding request: \(error.localizedDescription)")
+            logger?.error("Error encoding response: \(error.localizedDescription)")
             throw Error.encodeError(error)
         }
 
@@ -58,8 +62,8 @@ actor RequestPipe {
         do {
             try await writePipe.write(data)
         } catch {
-            logger?.error("Error sending request: \(error.localizedDescription)")
+            logger?.error("Error sending response: \(error.localizedDescription)")
             throw Error.sendError(error)
         }
     }
-}
+} 

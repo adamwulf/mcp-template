@@ -10,10 +10,6 @@
 		C50BB13C2DA9F24E0094A152 /* EasyMCP in Frameworks */ = {isa = PBXBuildFile; productRef = C50BB13B2DA9F24E0094A152 /* EasyMCP */; };
 		C50BB13E2DA9F24E0094A152 /* EasyMacMCP in Frameworks */ = {isa = PBXBuildFile; productRef = C50BB13D2DA9F24E0094A152 /* EasyMacMCP */; };
 		C50BB18E2DA9F3870094A152 /* EasyMacMCP in Frameworks */ = {isa = PBXBuildFile; productRef = C50BB18D2DA9F3870094A152 /* EasyMacMCP */; };
-		C50BB2022DAA00140094A152 /* ResponsePipe.swift in Sources */ = {isa = PBXBuildFile; fileRef = C50BB2012DAA00140094A152 /* ResponsePipe.swift */; };
-		C50BB2032DAA00140094A152 /* RequestPipe.swift in Sources */ = {isa = PBXBuildFile; fileRef = C50BB2002DAA00140094A152 /* RequestPipe.swift */; };
-		C50BB2042DAA00140094A152 /* ResponsePipe.swift in Sources */ = {isa = PBXBuildFile; fileRef = C50BB2012DAA00140094A152 /* ResponsePipe.swift */; };
-		C50BB2052DAA00140094A152 /* RequestPipe.swift in Sources */ = {isa = PBXBuildFile; fileRef = C50BB2002DAA00140094A152 /* RequestPipe.swift */; };
 		C55B13A82D87D10B00E77939 /* mcp-helper in Copy Helper Tools */ = {isa = PBXBuildFile; fileRef = C55B139E2D87D0F100E77939 /* mcp-helper */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		C57BC9CC2D9DD7B800D817AD /* PipeConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = C57BC9CB2D9DD7B800D817AD /* PipeConstants.swift */; };
 		C57BC9CD2D9DD7B800D817AD /* PipeConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = C57BC9CB2D9DD7B800D817AD /* PipeConstants.swift */; };
@@ -54,8 +50,6 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		C50BB2002DAA00140094A152 /* RequestPipe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RequestPipe.swift; sourceTree = "<group>"; };
-		C50BB2012DAA00140094A152 /* ResponsePipe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResponsePipe.swift; sourceTree = "<group>"; };
 		C55B135B2D87CDAC00E77939 /* MCPExample.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MCPExample.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C55B139E2D87D0F100E77939 /* mcp-helper */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "mcp-helper"; sourceTree = BUILT_PRODUCTS_DIR; };
 		C55B13B52D87D16100E77939 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
@@ -127,8 +121,6 @@
 		C57BC9BE2D9DD3B100D817AD /* Shared */ = {
 			isa = PBXGroup;
 			children = (
-				C50BB2002DAA00140094A152 /* RequestPipe.swift */,
-				C50BB2012DAA00140094A152 /* ResponsePipe.swift */,
 				C57BC9CB2D9DD7B800D817AD /* PipeConstants.swift */,
 			);
 			path = Shared;
@@ -307,8 +299,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				C50BB2022DAA00140094A152 /* ResponsePipe.swift in Sources */,
-				C50BB2032DAA00140094A152 /* RequestPipe.swift in Sources */,
 				C57BC9CC2D9DD7B800D817AD /* PipeConstants.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -317,8 +307,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				C50BB2042DAA00140094A152 /* ResponsePipe.swift in Sources */,
-				C50BB2052DAA00140094A152 /* RequestPipe.swift in Sources */,
 				C57BC9CD2D9DD7B800D817AD /* PipeConstants.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
