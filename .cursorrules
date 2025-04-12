@@ -24,10 +24,11 @@ This project aims to create a simple command line executable and Swift package t
    - Purpose: Mac-specific implementation for MCP with pipe communication supporting multiple concurrent MCP servers
    - Dependencies: EasyMCP
    - Key Files:
-     - Sources/EasyMacMCP/MCPTools.swift - Wrapper for MCP tools that manages sending requests through pipes and handles responses with timeouts
-     - Sources/EasyMacMCP/MCPProtocols.swift - Defines protocols for MCP communication
-     - Sources/EasyMacMCP/MCPResponseReader.swift - Asynchronous reader that continuously reads responses from a server-specific pipe and dispatches them to ResponseManager
-     - Sources/EasyMacMCP/ResponseManager.swift - Actor that coordinates requests and responses, manages timeouts, and resolves async continuations for a specific MCP server
+     - Sources/EasyMacMCP/EasyMacMCP.swift - Main generic implementation that accepts Request/Response types and handles communication via pipes
+     - Sources/EasyMacMCP/HelperRequestPipe.swift - Actor that wraps WritePipe for sending requests from MCP servers to the Mac app
+     - Sources/EasyMacMCP/HelperResponsePipe.swift - Actor that wraps ReadPipe for receiving responses from the Mac app
+     - Sources/EasyMacMCP/MCPProtocols.swift - Defines protocols for MCP communication (MCPRequestProtocol and MCPResponseProtocol)
+     - Sources/EasyMacMCP/ResponseManager.swift - Actor that coordinates requests and responses, manages timeouts, and resolves async continuations
      - Sources/EasyMacMCP/ReadPipe.swift - Comprehensive implementation for creating, opening, and reading from named pipes with error handling
      - Sources/EasyMacMCP/WritePipe.swift - Counterpart to ReadPipe for creating, opening, and writing to named pipes with error handling
      - Sources/EasyMacMCP/PipeProtocols.swift - Defines protocol interfaces for PipeReadable and PipeWritable to allow mocking for testing
@@ -107,9 +108,9 @@ The MCPExample targets demonstrate:
 ### Current Implementation Status:
 - Package structure fully implemented with EasyMCP and EasyMacMCP targets
 - Pipe communication architecture updated to support multiple concurrent MCP servers
-- Implemented role-specific pipe actors (HostRequestPipe, HostResponsePipe, HelperRequestPipe, HelperResponsePipe)
+- EasyMacMCP now uses a generic architecture with type-safe Request and Response types
 - Communication follows hub-and-spoke model with central request pipe and helper-specific response pipes
-- Basic MCP functionality implemented with helloWorld and helloPerson examples
+- EasyMacMCP passes through tool calls to the Mac app and awaits responses
 
 ## Communication Mechanism
 - MCPExample and mcp-helper communicate via named pipes (FIFOs) in a shared app group container
@@ -123,3 +124,8 @@ The MCPExample targets demonstrate:
   4. Mac app creates and writes to a dedicated response pipe named with the helperId
   5. Each MCP server reads from its own dedicated response pipe, avoiding contention
 - This architecture enables the Mac app to communicate with multiple MCP server instances simultaneously
+- The new generic EasyMacMCP implementation allows for type-safe tool communication:
+  1. EasyMacMCP registerTool() takes a requestBuilder function to convert from MCP parameters to a custom Request type
+  2. When a tool is called, it creates a Request, sends it through the pipe, and waits for a matching Response
+  3. The Mac app receives the request, handles the tool logic, and sends back a typed Response
+  4. The EasyMacMCP server matches the Response to the originating request using helperId and messageId
