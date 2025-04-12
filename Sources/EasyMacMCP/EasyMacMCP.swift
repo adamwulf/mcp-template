@@ -35,12 +35,8 @@ public final class EasyMacMCP<Request: MCPRequestProtocol, Response: MCPResponse
     private let helperId: String
     // Request pipe for sending messages to the host app
     private let requestPipe: HelperRequestPipe
-    // Response pipe for receiving messages from the host app
-    private let responsePipe: HelperResponsePipe
     // Response manager for matching requests and responses
     private let responseManager: ResponseManager<Response>
-    // Task for the response reader
-    private var responseReaderTask: Task<Void, Never>?
     // Tools with handlers
     private var tools: [String: ToolRegistration] = [:]
 
@@ -58,9 +54,8 @@ public final class EasyMacMCP<Request: MCPRequestProtocol, Response: MCPResponse
     ) {
         self.helperId = helperId
         self.requestPipe = requestPipe
-        self.responsePipe = responsePipe
+        self.responseManager = ResponseManager(responsePipe: responsePipe, logger: logger)
         self.logger = logger
-        self.responseManager = ResponseManager()
 
         // Initialize the MCP server with basic capabilities
         server = MCP.Server(
@@ -99,10 +94,9 @@ public final class EasyMacMCP<Request: MCPRequestProtocol, Response: MCPResponse
 
         // Open the pipes
         try await requestPipe.open()
-        try await responsePipe.open()
 
-        // Start the response reader
-        startResponseReader()
+        // Start the response manager
+        try await responseManager.startReading()
 
         // Start the server
         serverTask = Task<Void, Swift.Error> {
@@ -128,47 +122,16 @@ public final class EasyMacMCP<Request: MCPRequestProtocol, Response: MCPResponse
             return
         }
 
-        // Stop the response reader
-        responseReaderTask?.cancel()
+        // Stop the response manager
+        await responseManager.stopReading()
 
         // Close the pipes
         await requestPipe.close()
-        await responsePipe.close()
 
         await server.stop()
         serverTask?.cancel()
         isRunning = false
         logger?.info("EasyMacMCP server stopped")
-    }
-
-    // MARK: - Response Reader
-
-    /// Start reading responses from the response pipe
-    private func startResponseReader() {
-        responseReaderTask?.cancel()
-
-        responseReaderTask = Task {
-            do {
-                while !Task.isCancelled {
-                    if let line = try await responsePipe.readLine() {
-                        // Try to decode the response directly to the Response type
-                        if let responseData = line.data(using: .utf8) {
-                            do {
-                                let decoder = JSONDecoder()
-                                let response = try decoder.decode(Response.self, from: responseData)
-                                await responseManager.handleResponse(response)
-                            } catch {
-                                logger?.error("Failed to decode response: \(error)")
-                            }
-                        } else {
-                            logger?.error("Failed to convert response to data: \(line)")
-                        }
-                    }
-                }
-            } catch {
-                logger?.error("Error in response reader: \(error)")
-            }
-        }
     }
 
     // MARK: - Tools

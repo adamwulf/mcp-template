@@ -1,10 +1,27 @@
 import Foundation
+import Logging
 
 /// Errors that can occur during response handling
 public enum ResponseError: Error, Equatable {
     case timeout
     case requestCancelled
     case invalidResponse
+    case readError(Error)
+
+    public static func == (lhs: ResponseError, rhs: ResponseError) -> Bool {
+        switch (lhs, rhs) {
+        case (.timeout, .timeout):
+            return true
+        case (.requestCancelled, .requestCancelled):
+            return true
+        case (.invalidResponse, .invalidResponse):
+            return true
+        case (.readError(let lhsError), .readError(let rhsError)):
+            return lhsError.localizedDescription == rhsError.localizedDescription
+        default:
+            return false
+        }
+    }
 }
 
 /// A manager that coordinates requests and responses between the helper and the app
@@ -12,8 +29,60 @@ public enum ResponseError: Error, Equatable {
 public actor ResponseManager<Response: MCPResponseProtocol> {
     // Map from "{helperId}:{messageId}" to continuation
     private var pendingRequests: [String: CheckedContinuation<Response, Error>] = [:]
+    // Response pipe for receiving messages from the host app
+    private let responsePipe: HelperResponsePipe
+    // Task for the response reader
+    private var responseReaderTask: Task<Void, Never>?
+    // Logger instance
+    private let logger: Logger?
 
-    public init() {}
+    public init(responsePipe: HelperResponsePipe, logger: Logger? = nil) {
+        self.responsePipe = responsePipe
+        self.logger = logger
+    }
+
+    /// Start reading responses from the response pipe
+    public func startReading() async throws {
+        responseReaderTask?.cancel()
+
+        // Open the pipe
+        try await responsePipe.open()
+        logger?.info("Response pipe opened, starting to read responses")
+
+        responseReaderTask = Task {
+            do {
+                while !Task.isCancelled {
+                    if let line = try await responsePipe.readLine() {
+                        // Try to decode the response directly to the Response type
+                        if let responseData = line.data(using: .utf8) {
+                            do {
+                                let decoder = JSONDecoder()
+                                let response = try decoder.decode(Response.self, from: responseData)
+                                logger?.debug("Received response: \(response)")
+                                handleResponse(response)
+                            } catch {
+                                logger?.error("Failed to decode response: \(error)")
+                            }
+                        } else {
+                            logger?.error("Failed to convert response to data: \(line)")
+                        }
+                    }
+                }
+            } catch {
+                logger?.error("Error in response reader: \(error)")
+            }
+        }
+    }
+
+    /// Stop reading from the response pipe
+    public func stopReading() async {
+        responseReaderTask?.cancel()
+        responseReaderTask = nil
+
+        // Close the pipe
+        await responsePipe.close()
+        logger?.info("Response pipe closed, stopped reading responses")
+    }
 
     /// Wait for a response with the given helperId and messageId
     /// - Parameters:
@@ -38,7 +107,7 @@ public actor ResponseManager<Response: MCPResponseProtocol> {
 
     /// Handle a response received from the app
     /// - Parameter response: The response to process
-    public func handleResponse(_ response: Response) async {
+    private func handleResponse(_ response: Response) {
         let messageId = response.messageId
 
         let requestKey = "\(response.helperId):\(messageId)"
