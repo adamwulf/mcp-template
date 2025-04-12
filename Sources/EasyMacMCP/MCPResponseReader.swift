@@ -1,19 +1,26 @@
 import Foundation
 
 /// A reader for MCP responses that dispatches them to a ResponseManager
-public actor MCPResponseReader {
+public actor MCPResponseReader<Response: MCPResponseProtocol> {
     private let pipe: PipeReadable
-    private let responseManager: ResponseManager
+    private let responseManager: ResponseManager<Response>
     private var readTask: Task<Void, Never>?
     private var isReading = false
+    private let responseDecoder: (String) -> Response?
 
     /// Initializes a new response reader
     /// - Parameters:
     ///   - pipe: The pipe to read responses from
     ///   - responseManager: The response manager to dispatch responses to
-    public init(pipe: PipeReadable, responseManager: ResponseManager) {
+    ///   - responseDecoder: A closure that decodes a string into a Response
+    public init(
+        pipe: PipeReadable,
+        responseManager: ResponseManager<Response>,
+        responseDecoder: @escaping (String) -> Response?
+    ) {
         self.pipe = pipe
         self.responseManager = responseManager
+        self.responseDecoder = responseDecoder
     }
 
     deinit {
@@ -35,7 +42,7 @@ public actor MCPResponseReader {
 
                 while !Task.isCancelled && isReading {
                     if let line = try await pipe.readLine() {
-                        if let response = parseResponse(line) {
+                        if let response = responseDecoder(line) {
                             await responseManager.handleResponse(response)
                         } else {
                             Logging.printError("Failed to parse response: \(line)")
@@ -54,19 +61,5 @@ public actor MCPResponseReader {
         isReading = false
         readTask?.cancel()
         readTask = nil
-    }
-
-    /// Parses a JSON string into an MCPResponse
-    /// - Parameter jsonString: The JSON string to parse
-    /// - Returns: The parsed response, or nil if parsing fails
-    private func parseResponse(_ jsonString: String) -> MCPResponse? {
-        guard let data = jsonString.data(using: .utf8) else { return nil }
-
-        do {
-            return try JSONDecoder().decode(MCPResponse.self, from: data)
-        } catch {
-            Logging.printError("Error decoding response", error: error)
-            return nil
-        }
     }
 }

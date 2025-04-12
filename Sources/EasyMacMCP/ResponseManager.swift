@@ -9,9 +9,9 @@ public enum ResponseError: Error, Equatable {
 
 /// A manager that coordinates requests and responses between the helper and the app
 /// Matches responses from the app to pending requests from the helper based on helperId and messageId
-public actor ResponseManager {
+public actor ResponseManager<Response: MCPResponseProtocol> {
     // Map from "{helperId}:{messageId}" to continuation
-    private var pendingRequests: [String: CheckedContinuation<MCPResponse, Error>] = [:]
+    private var pendingRequests: [String: CheckedContinuation<Response, Error>] = [:]
 
     public init() {}
 
@@ -22,7 +22,7 @@ public actor ResponseManager {
     ///   - timeout: The timeout in seconds (default: 5.0)
     /// - Returns: The matched response
     /// - Throws: ResponseError if the request times out or is cancelled
-    public func waitForResponse(helperId: String, messageId: String, timeout: TimeInterval = 5.0) async throws -> MCPResponse {
+    public func waitForResponse(helperId: String, messageId: String, timeout: TimeInterval = 5.0) async throws -> Response {
         let requestKey = "\(helperId):\(messageId)"
 
         return try await withCheckedThrowingContinuation { continuation in
@@ -38,7 +38,7 @@ public actor ResponseManager {
 
     /// Handle a response received from the app
     /// - Parameter response: The response to process
-    public func handleResponse(_ response: MCPResponse) async {
+    public func handleResponse(_ response: Response) async {
         let messageId = response.messageId
 
         let requestKey = "\(response.helperId):\(messageId)"

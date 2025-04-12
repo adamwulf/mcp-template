@@ -1,7 +1,8 @@
 import Foundation
+import EasyMacMCP
 
 /// Represents tool requests sent from the helper to the main app
-public enum MCPRequest: Codable, Sendable {
+public enum MCPRequest: MCPRequestProtocol {
 
     case initialize(helperId: String)
 
@@ -38,4 +39,4 @@ public enum MCPRequest: Codable, Sendable {
             return messageId
         }
     }
-}
+} 

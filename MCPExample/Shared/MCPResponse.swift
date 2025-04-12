@@ -1,7 +1,8 @@
 import Foundation
+import EasyMacMCP
 
 /// Represents responses sent from the main app back to the helper
-public enum MCPResponse: Sendable, Codable {
+public enum MCPResponse: MCPResponseProtocol {
     /// A tool with no parameters that returns a greeting
     case helloWorld(helperId: String, messageId: String, result: String)
 
@@ -34,4 +35,4 @@ public enum MCPResponse: Sendable, Codable {
             return messageId
         }
     }
-}
+} 
