@@ -68,12 +68,12 @@ final class MCPMacApp: ObservableObject, Sendable {
             requestDescription = "Deinitialize request from helper: \(helperId) with messageId: \(messageId)"
             // Teardown response pipe for this helper
             await teardownResponsePipe(for: helperId)
-        case .helloWorld(let messageId, _):
+        case .helloWorld:
             requestDescription = "HelloWorld request from helper: \(helperId) with messageId: \(messageId)"
             // Send response for helloWorld
             logger.info("MAC_APP: Preparing helloWorld response with messageId: \(messageId)")
             await sendHelloWorldResponse(helperId: helperId, messageId: messageId)
-        case .helloPerson(let messageId, _, let name):
+        case .helloPerson(_, _, let name):
             requestDescription = "HelloPerson request from helper: \(helperId) with messageId: \(messageId) and name: \(name)"
             // Send response for helloPerson
             logger.info("MAC_APP: Preparing helloPerson response with messageId: \(messageId)")
