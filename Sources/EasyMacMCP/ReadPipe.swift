@@ -2,7 +2,7 @@ import Foundation
 import Darwin
 
 /// Errors that can occur when working with ReadPipe
-enum ReadPipeError: Error {
+public enum ReadPipeError: Error {
     case invalidURL
     case failedToCreatePipe(String)
     case pipeAlreadyExists
@@ -18,7 +18,7 @@ enum ReadPipeError: Error {
 }
 
 /// A class for creating and reading from a named pipe (FIFO)
-actor ReadPipe: PipeReadable {
+public actor ReadPipe: PipeReadable {
     private let fileURL: URL
     private var fileHandle: FileHandle?
 
@@ -26,7 +26,7 @@ actor ReadPipe: PipeReadable {
     /// - Parameters:
     ///   - url: A file URL where the pipe should be created
     /// - Throws: ReadPipeError if initialization fails
-    init(url: URL) throws {
+    public init(url: URL) throws {
         guard url.isFileURL else {
             throw ReadPipeError.invalidURL
         }
@@ -73,7 +73,7 @@ actor ReadPipe: PipeReadable {
 
     /// Opens the pipe for reading without blocking on open, but allowing blocking reads
     /// - Throws: ReadPipeError if opening fails
-    func open() async throws {
+    public func open() async throws {
         // Make sure the path exists and is a pipe
         let pipePath = fileURL.path
         guard FileManager.default.fileExists(atPath: pipePath) else {
@@ -117,7 +117,7 @@ actor ReadPipe: PipeReadable {
     /// Reads a single line from the pipe
     /// - Returns: A single line as a string, or nil if the stream ends or no data available in non-blocking mode
     /// - Throws: ReadPipeError if reading fails
-    func readLine() async throws -> String? {
+    public func readLine() async throws -> String? {
         guard let fileHandle = fileHandle else {
             Logging.printError("Error: Pipe not opened")
             throw ReadPipeError.pipeNotOpened
@@ -138,7 +138,7 @@ actor ReadPipe: PipeReadable {
     }
 
     /// Closes the pipe
-    func close() async {
+    public func close() async {
         try? fileHandle?.close()
         fileHandle = nil
     }

@@ -2,7 +2,7 @@ import Foundation
 import Darwin
 
 /// Errors that can occur when working with WritePipe
-enum WritePipeError: Error {
+public enum WritePipeError: Error {
     case invalidURL
     case failedToCreatePipe(String)
     case pipeAlreadyExists
@@ -16,14 +16,14 @@ enum WritePipeError: Error {
 }
 
 /// A class for creating and writing to a named pipe (FIFO)
-actor WritePipe: PipeWritable {
+public actor WritePipe: PipeWritable {
     private let fileURL: URL
     private var fileHandle: FileHandle?
 
     /// Initialize with a URL that represents where the pipe should be created
     /// - Parameter url: A file URL where the pipe should be created
     /// - Throws: WritePipeError if initialization fails
-    init(url: URL) throws {
+    public init(url: URL) throws {
         guard url.isFileURL else {
             Logging.printError("Error: URL must be a file URL")
             throw WritePipeError.invalidURL
@@ -80,7 +80,7 @@ actor WritePipe: PipeWritable {
 
     /// Opens the pipe for writing using non-blocking mode to prevent hanging
     /// - Throws: WritePipeError if opening fails
-    func open() throws {
+    public func open() throws {
         // Make sure the path exists and is a pipe
         let pipePath = fileURL.path
         guard FileManager.default.fileExists(atPath: pipePath) else {
@@ -126,7 +126,7 @@ actor WritePipe: PipeWritable {
     /// Writes data to the pipe
     /// - Parameter data: The data to write
     /// - Throws: WritePipeError if writing fails
-    func write(_ data: Data) throws {
+    public func write(_ data: Data) throws {
         guard let fileHandle = fileHandle else {
             Logging.printError("Error: Pipe not opened")
             throw WritePipeError.pipeNotOpened
@@ -148,7 +148,7 @@ actor WritePipe: PipeWritable {
     }
 
     /// Closes the pipe
-    func close() {
+    public func close() {
         try? fileHandle?.close()
         fileHandle = nil
     }

@@ -1,7 +1,8 @@
 import Foundation
 import ArgumentParser
-import EasyMCP
 import Logging
+import EasyMacMCP
+import EasyMCP
 
 @main
 struct MCPHelper: AsyncParsableCommand {
@@ -60,7 +61,8 @@ struct RunCommand: AsyncParsableCommand, Decodable {
         // Use the new PipeTestHelpers to test pipe functionality
         Task {
             await PipeTestHelpers.testWritePipeAsync(
-                message: "Hello World from mcp-helper through PipeTestHelpers!\n"
+                message: "Hello World from mcp-helper through PipeTestHelpers!\n",
+                pipePath: PipeConstants.helperToAppPipePath()
             )
         }
 

@@ -5,6 +5,7 @@
 //  Created by Adam Wulf on 4/3/25.
 //
 import Foundation
+import EasyMacMCP
 
 actor HelperPipes {
 

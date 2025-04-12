@@ -1,7 +1,7 @@
 import Foundation
 
 /// Represents tool requests sent from the helper to the main app
-public enum MCPRequest: Codable {
+public enum MCPRequest: Codable, Sendable {
 
     case initialize(helperId: String)
 

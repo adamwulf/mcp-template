@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import EasyMacMCP
 
 @main
 struct MCPExampleApp: App {
@@ -97,7 +98,10 @@ final class DebugHelperPipeReader: ObservableObject, Sendable {
     func testWriteToPipe() {
         Task {
             writeStatus = "Writing to pipe..."
-            let success = await PipeTestHelpers.testWritePipeAsync(message: "Test message from MCPExampleApp!")
+            let success = await PipeTestHelpers.testWritePipeAsync(
+                message: "Test message from MCPExampleApp!",
+                pipePath: PipeConstants.appToHelperPipePath()
+            )
             writeStatus = success ? "Write successful!" : "Write failed!"
 
             // Clear status after a delay

@@ -16,8 +16,15 @@ public protocol PipeReadable: Sendable {
 
 /// Protocol for objects that can write to a pipe
 public protocol PipeWritable: Sendable {
+    func open() async throws
+
     /// Writes a message to the pipe
     /// - Parameter message: The message to write
     /// - Throws: Error if writing fails
     func write(_ message: String) async throws
+
+    func write(_ data: Data) async throws
+
+    /// Closes the pipe
+    func close() async
 }

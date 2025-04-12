@@ -51,6 +51,10 @@ public actor MockPipeWriter: PipeWritable {
 
     public init() {}
 
+    public func open() async throws {
+        // noop
+    }
+
     /// Simulates writing a message to the pipe
     /// - Parameter message: The message to write
     public func write(_ message: String) throws {
@@ -58,6 +62,14 @@ public actor MockPipeWriter: PipeWritable {
 
         // Call the handler if one is set
         try writeHandler?(message)
+    }
+
+    public func write(_ data: Data) async throws {
+        fatalError("not yet implemented")
+    }
+
+    public func close() async {
+        // noop
     }
 
     /// Clears all written messages
