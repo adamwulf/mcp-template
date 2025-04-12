@@ -78,15 +78,16 @@ The MCPExample targets demonstrate:
    - Purpose: Background helper process that runs the actual MCP server (can be launched multiple times)
    - Dependencies: EasyMacMCP, ArgumentParser
    - Key Files:
-     - MCPExample/mcp-helper/MCPHelper.swift - Command line implementation that initializes EasyMacMCP communication with a unique helperId and runs the MCP server
+     - MCPExample/mcp-helper/MCPHelper.swift - Command line implementation that initializes MCP server with a unique helper ID
      - MCPExample/mcp-helper/BuildSettings.swift - Shared build configuration with constants for app group identifier and bundle IDs
-     - MCPExample/mcp-helper/HelperPipes.swift - Helper class that manages communication between the helper and the Mac app
 
 3. Shared Folder (Common Code)
    - Purpose: Contains code shared between MCPExample and mcp-helper
    - Located at: MCPExample/Shared/
    - Key Files:
-     - PipeConstants.swift - Utility that provides URL paths for the shared request pipe and functions to generate server-specific response pipe paths
+     - PipeConstants.swift - Defines paths for the central request pipe and helper-specific response pipes
+     - RequestPipe.swift - Actor that wraps WritePipe for sending requests from helpers to the Mac app
+     - ResponsePipe.swift - Actor that wraps ReadPipe for receiving responses from the Mac app
 
 ### Dependencies:
 - swift-argument-parser (1.3.0+) - Used for CLI argument handling
@@ -94,21 +95,20 @@ The MCPExample targets demonstrate:
 
 ### Current Implementation Status:
 - Package structure fully implemented with EasyMCP and EasyMacMCP targets
-- Pipe communication mechanism working for single server connection
-- Requires update to support multiple concurrent MCP servers following the hub-and-spoke model
+- Pipe communication architecture updated to support multiple concurrent MCP servers
+- Replaced HelperPipes with more focused RequestPipe and ResponsePipe actors
+- Communication follows hub-and-spoke model with central request pipe and helper-specific response pipes
 - Basic MCP functionality implemented with helloWorld and helloPerson examples
-- MCPExample demonstrates bidirectional communication between GUI and MCP server
 
 ## Communication Mechanism
 - MCPExample and mcp-helper communicate via named pipes (FIFOs) in a shared app group container
 - The communication follows a hub-and-spoke pattern:
-  - One centralized pipe for all MCP servers to write to the Mac app (many-to-one)
-  - Individual dedicated pipes for the Mac app to respond to each specific MCP server (one-to-many)
+  - One centralized pipe for all MCP servers to write to the Mac app (many-to-one) via RequestPipe
+  - Individual dedicated pipes for the Mac app to respond to each specific MCP server (one-to-many) via ResponsePipe
 - Flow:
   1. Each MCP server instance launches with a unique helperId
-  2. The server sends an initialize() request via the shared input pipe to the Mac app
+  2. The server sends an initialize() request via the central request pipe to the Mac app
   3. Mac app receives this request and recognizes the new server by its helperId
-  4. Mac app writes all responses for that specific server to a dedicated pipe named with the helperId
-  5. Each MCP server only reads from its own dedicated response pipe, avoiding contention
+  4. Mac app creates and writes to a dedicated response pipe named with the helperId
+  5. Each MCP server reads from its own dedicated response pipe, avoiding contention
 - This architecture enables the Mac app to communicate with multiple MCP server instances simultaneously
-- EasyMacMCP provides the core classes for this communication with request/response handling

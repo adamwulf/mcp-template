@@ -29,29 +29,60 @@ struct RunCommand: AsyncParsableCommand, Decodable {
 
     // Unique identifier for this helper instance
     private let helperId: String
-    private let pipes: HelperPipes
     private let logger = Logger(label: "com.milestonemade.easymcp")
+
+    // Pipe for sending requests to the Mac app
+    private var requestPipe: RequestPipe
+
+    // Pipe for receiving responses from the Mac app
+    private var responsePipe: ResponsePipe
 
     init() {
         helperId = UUID().uuidString
-        let helperToApp = try! WritePipe(url: PipeConstants.helperToAppPipePath())
-        let appToHelper = try! ReadPipe(url: PipeConstants.appToHelperPipePath())
-        pipes = HelperPipes(writePipe: helperToApp, readPipe: appToHelper, logger: logger)
+        requestPipe = try! RequestPipe(
+            url: PipeConstants.centralRequestPipePath(),
+            logger: logger
+        )
+        responsePipe = try! ResponsePipe(
+            url: PipeConstants.helperResponsePipePath(helperId: helperId),
+            logger: logger
+        )
     }
 
     init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         helperId = try container.decode(String.self, forKey: .helperId)
-        let helperToApp = try WritePipe(url: PipeConstants.helperToAppPipePath())
-        let appToHelper = try ReadPipe(url: PipeConstants.appToHelperPipePath())
-        pipes = HelperPipes(writePipe: helperToApp, readPipe: appToHelper, logger: logger)
+        requestPipe = try RequestPipe(
+            url: PipeConstants.centralRequestPipePath(),
+            logger: logger
+        )
+        responsePipe = try ResponsePipe(
+            url: PipeConstants.helperResponsePipePath(helperId: helperId),
+            logger: logger
+        )
     }
 
     func run() async throws {
-        try await pipes.open()
+        // Create pipes
+        do {
 
-        // Send initialize message
-        try await pipes.sendToolRequest(.initialize(helperId: helperId))
+            // Open pipes
+            try await requestPipe.open()
+            try await responsePipe.open()
+
+            // Send initialize message
+            try await requestPipe.sendRequest(.initialize(helperId: helperId))
+
+            // Start reading responses
+            await responsePipe.startReading { response in
+                print("Received response: \(response)")
+                // Handle different response types if needed
+            }
+
+        } catch {
+            logger.error("Failed to set up pipes: \(error)")
+            throw error
+        }
 
         // build server
         let mcp = EasyMCP(logger: logger)
@@ -61,21 +92,14 @@ struct RunCommand: AsyncParsableCommand, Decodable {
         try await Task.sleep(for: .seconds(3))
         #endif
 
-        // Use the new PipeTestHelpers to test pipe functionality
-        Task {
-            await PipeTestHelpers.testWritePipeAsync(
-                message: "Hello World from mcp-helper through PipeTestHelpers!\n",
-                pipePath: PipeConstants.helperToAppPipePath()
-            )
-        }
-
         // Set up signal handling to gracefully exit
         let signalSource = DispatchSource.makeSignalSource(signal: SIGINT, queue: .main)
         signal(SIGINT, SIG_IGN)
         signalSource.setEventHandler {
             Task {
                 // Send deinitialize message before stopping
-                try await pipes.sendToolRequest(.deinitialize(helperId: self.helperId))
+                try? await self.requestPipe.sendRequest(.deinitialize(helperId: self.helperId))
+                await self.responsePipe.close()
                 await mcp.stop()
                 RunCommand.exit()
             }
@@ -89,7 +113,11 @@ struct RunCommand: AsyncParsableCommand, Decodable {
         )) { _ in
             // Send the helloWorld request to the main app
             Task {
-                try await pipes.sendToolRequest(.helloWorld(helperId: self.helperId, messageId: UUID().uuidString))
+                let messageId = UUID().uuidString
+                try? await self.requestPipe.sendRequest(.helloWorld(
+                    helperId: self.helperId,
+                    messageId: messageId
+                ))
             }
             return Result(content: [.text(helloworld())], isError: false)
         }
@@ -111,7 +139,12 @@ struct RunCommand: AsyncParsableCommand, Decodable {
             let name = input["name"]?.stringValue ?? "world"
             // Send the helloPerson request to the main app
             Task {
-                try await pipes.sendToolRequest(.helloPerson(helperId: self.helperId, messageId: UUID().uuidString, name: name))
+                let messageId = UUID().uuidString
+                try? await self.requestPipe.sendRequest(.helloPerson(
+                    helperId: self.helperId,
+                    messageId: messageId,
+                    name: name
+                ))
             }
             return Result(content: [.text(hello(name))], isError: false)
         }
@@ -137,8 +170,10 @@ struct RunCommand: AsyncParsableCommand, Decodable {
 
         // Wait until the server is finished processing all input
         try await mcp.waitUntilComplete()
-        try await pipes.sendToolRequest(.deinitialize(helperId: helperId))
-        try await pipes.close()
+
+        // Clean up
+        try? await requestPipe.sendRequest(.deinitialize(helperId: helperId))
+        await responsePipe.close()
     }
 
     /// A simple example method
