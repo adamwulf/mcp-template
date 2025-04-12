@@ -24,10 +24,8 @@ This project aims to create a simple command line executable and Swift package t
    - Purpose: Mac-specific implementation for MCP with pipe communication supporting multiple concurrent MCP servers
    - Dependencies: EasyMCP
    - Key Files:
-     - Sources/EasyMacMCP/EasyMacMCP.swift - Entry point for macOS-specific MCP utilities that facilitates communication setup between helper processes and Mac app
      - Sources/EasyMacMCP/MCPTools.swift - Wrapper for MCP tools that manages sending requests through pipes and handles responses with timeouts
-     - Sources/EasyMacMCP/MCPRequest.swift - Defines tool request types (initialize, deinitialize, helloWorld, helloPerson) sent from helpers to app with helperId for server identification
-     - Sources/EasyMacMCP/MCPResponse.swift - Defines response types sent from app back to helpers, with properties to extract helperId and messageId for routing
+     - Sources/EasyMacMCP/MCPProtocols.swift - Defines protocols for MCP communication
      - Sources/EasyMacMCP/MCPResponseReader.swift - Asynchronous reader that continuously reads responses from a server-specific pipe and dispatches them to ResponseManager
      - Sources/EasyMacMCP/ResponseManager.swift - Actor that coordinates requests and responses, manages timeouts, and resolves async continuations for a specific MCP server
      - Sources/EasyMacMCP/ReadPipe.swift - Comprehensive implementation for creating, opening, and reading from named pipes with error handling
@@ -36,7 +34,6 @@ This project aims to create a simple command line executable and Swift package t
      - Sources/EasyMacMCP/PipeTestHelpers.swift - Utility functions to test pipe writing/reading with synchronous and asynchronous options
      - Sources/EasyMacMCP/FileManager+Pipe.swift - FileManager extension to check if a URL points to a named pipe using stat() system call
      - Sources/EasyMacMCP/Logging.swift - Mac-specific logging utilities with error, warning, and info levels that print to stderr/stdout
-     - Sources/EasyMacMCP/MockPipe.swift - Mock implementations of PipeReadable and PipeWritable interfaces for unit testing
 
 3. mcpexample (Executable)
    - Purpose: Command-line example using EasyMCP library
@@ -58,6 +55,7 @@ This project aims to create a simple command line executable and Swift package t
      - Tests/EasyMacMCPTests/MCPResponseReaderTests.swift - Tests for MCPResponseReader to ensure proper parsing and handling of responses
      - Tests/EasyMacMCPTests/ResponseManagerTests.swift - Tests for ResponseManager that verify response matching, timeout handling, and cancellation
      - Tests/EasyMacMCPTests/PipeConstants.swift - Constants for pipe paths used in testing
+     - Tests/EasyMacMCPTests/MockPipe.swift - Mock implementations of PipeReadable and PipeWritable interfaces for unit testing
 
 ### MCPExample Targets:
 
@@ -70,7 +68,8 @@ The MCPExample targets demonstrate:
    - Purpose: macOS SwiftUI application that demonstrates MCP integration with multiple helpers
    - Dependencies: EasyMacMCP
    - Key Files:
-     - MCPExample/MCPExample/MCPExampleApp.swift - Main app implementation with DebugHelperPipeReader that detects new MCP server connections
+     - MCPExample/MCPExample/MCPExampleApp.swift - Main app entry point
+     - MCPExample/MCPExample/MCPMacApp.swift - Main implementation with DebugHelperPipeReader that detects new MCP server connections
      - MCPExample/MCPExample/ContentView.swift - SwiftUI interface with controls to test pipe communication and display messages
      - MCPExample/MCPExample/BuildSettings.swift - Shared build configuration including app group identifier for shared container access
 
@@ -86,6 +85,8 @@ The MCPExample targets demonstrate:
    - Located at: MCPExample/Shared/
    - Key Files:
      - PipeConstants.swift - Defines paths for the central request pipe and helper-specific response pipes
+     - MCPRequest.swift - Defines tool request types (initialize, deinitialize, helloWorld, helloPerson) sent from helpers to app with helperId for server identification
+     - MCPResponse.swift - Defines response types sent from app back to helpers, with properties to extract helperId and messageId for routing
 
 ### Mac App Specific Components:
    - Located at: MCPExample/MCPExample/
