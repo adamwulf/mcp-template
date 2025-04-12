@@ -64,7 +64,9 @@ final class MCPMacApp: ObservableObject, Sendable {
             requestDescription = "HelloPerson request from helper: \(helperId) with name: \(name)"
         }
 
-        self.messages.append(requestDescription)
+        DispatchQueue.main.async {
+            self.messages.append(requestDescription)
+        }
         print(requestDescription)
 
         // Setup response pipe for this helper if needed
