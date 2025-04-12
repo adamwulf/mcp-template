@@ -53,25 +53,30 @@ final class MCPMacApp: ObservableObject, Sendable {
     private func handleRequest(_ request: MCPRequest) async {
         // Extract helper ID from the request
         let helperId = request.helperId
+        let messageId = request.messageId
+
+        logger.info("MAC_APP: Received request from helper \(helperId) with messageId: \(messageId)")
 
         // Update the UI
         let requestDescription: String
         switch request {
         case .initialize:
-            requestDescription = "Initialize request from helper: \(helperId)"
+            requestDescription = "Initialize request from helper: \(helperId) with messageId: \(messageId)"
             // Setup response pipe only for initialize requests
             await setupResponsePipe(for: helperId)
         case .deinitialize:
-            requestDescription = "Deinitialize request from helper: \(helperId)"
+            requestDescription = "Deinitialize request from helper: \(helperId) with messageId: \(messageId)"
             // Teardown response pipe for this helper
             await teardownResponsePipe(for: helperId)
         case .helloWorld(let messageId, _):
-            requestDescription = "HelloWorld request from helper: \(helperId)"
+            requestDescription = "HelloWorld request from helper: \(helperId) with messageId: \(messageId)"
             // Send response for helloWorld
+            logger.info("MAC_APP: Preparing helloWorld response with messageId: \(messageId)")
             await sendHelloWorldResponse(helperId: helperId, messageId: messageId)
         case .helloPerson(let messageId, _, let name):
-            requestDescription = "HelloPerson request from helper: \(helperId) with name: \(name)"
+            requestDescription = "HelloPerson request from helper: \(helperId) with messageId: \(messageId) and name: \(name)"
             // Send response for helloPerson
+            logger.info("MAC_APP: Preparing helloPerson response with messageId: \(messageId)")
             await sendHelloPersonResponse(helperId: helperId, messageId: messageId, name: name)
         }
 
@@ -108,7 +113,7 @@ final class MCPMacApp: ObservableObject, Sendable {
 
     private func teardownResponsePipe(for helperId: String) async {
         guard let pipe = responsePipes[helperId] else { return }
-        
+
         print("Closing response pipe for helper \(helperId)")
         await pipe.close()
         responsePipes.removeValue(forKey: helperId)
@@ -116,47 +121,59 @@ final class MCPMacApp: ObservableObject, Sendable {
 
     private func sendHelloWorldResponse(helperId: String, messageId: String) async {
         guard let pipe = responsePipes[helperId] else {
-            print("Error: No response pipe for helper \(helperId)")
+            logger.error("MAC_APP: Error: No response pipe for helper \(helperId)")
             return
         }
-        
+
+        logger.info("MAC_APP: Creating helloWorld response with original messageId: \(messageId)")
+
         do {
             let response = MCPResponse.helloWorld(
                 helperId: helperId,
                 messageId: messageId,
                 result: "Hello World from Mac app at \(Date())"
             )
-            
+
+            logger.info("MAC_APP: Response created with helperId: \(response.helperId), messageId: \(response.messageId)")
+
             try await pipe.sendResponse(response)
-            
+
+            logger.info("MAC_APP: Successfully sent helloWorld response with messageId: \(messageId)")
+
             DispatchQueue.main.async {
-                self.messages.append("Sent helloWorld response to \(helperId)")
+                self.messages.append("Sent helloWorld response to \(helperId) with messageId: \(messageId)")
             }
         } catch {
-            print("Error sending helloWorld response: \(error)")
+            logger.error("MAC_APP: Error sending helloWorld response: \(error)")
         }
     }
-    
+
     private func sendHelloPersonResponse(helperId: String, messageId: String, name: String) async {
         guard let pipe = responsePipes[helperId] else {
-            print("Error: No response pipe for helper \(helperId)")
+            logger.error("MAC_APP: Error: No response pipe for helper \(helperId)")
             return
         }
-        
+
+        logger.info("MAC_APP: Creating helloPerson response with original messageId: \(messageId)")
+
         do {
             let response = MCPResponse.helloPerson(
                 helperId: helperId,
                 messageId: messageId,
                 result: "Hello \(name) from Mac app at \(Date())"
             )
-            
+
+            logger.info("MAC_APP: Response created with helperId: \(response.helperId), messageId: \(response.messageId)")
+
             try await pipe.sendResponse(response)
-            
+
+            logger.info("MAC_APP: Successfully sent helloPerson response with messageId: \(messageId)")
+
             DispatchQueue.main.async {
-                self.messages.append("Sent helloPerson response to \(helperId)")
+                self.messages.append("Sent helloPerson response to \(helperId) with messageId: \(messageId)")
             }
         } catch {
-            print("Error sending helloPerson response: \(error)")
+            logger.error("MAC_APP: Error sending helloPerson response: \(error)")
         }
     }
 

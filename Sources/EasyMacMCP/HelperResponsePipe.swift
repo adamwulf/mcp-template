@@ -69,9 +69,11 @@ public actor HelperResponsePipe {
     /// Read a single response from the pipe
     /// - Returns: The response as a String
     public func readLine() async throws -> String? {
-        return try await readPipe.readLine()
+        let line = try await readPipe.readLine()
+        logger?.info("HELPER_RESPONSE_PIPE: Read line from pipe: \(line ?? "nil")")
+        return line
     }
-    
+
     /// Read and decode a single response from the pipe
     /// - Returns: The decoded Response or nil if end of stream or decoding fails
     public func readResponse<Response: Decodable>() async throws -> Response? {
@@ -79,9 +81,10 @@ public actor HelperResponsePipe {
             return nil
         }
 
+        logger?.info("HELPER_RESPONSE_PIPE: Raw response: \(string)")
         return try parseResponse(from: string, as: Response.self)
     }
-    
+
     /// Parse a response string to a specific type
     /// - Parameters:
     ///   - string: The string to parse
@@ -91,10 +94,19 @@ public actor HelperResponsePipe {
     private func parseResponse<T: Decodable>(from string: String, as type: T.Type) throws -> T {
         do {
             let decoder = JSONDecoder()
-            return try decoder.decode(type, from: Data(string.utf8))
+            let result = try decoder.decode(type, from: Data(string.utf8))
+
+            // Try to log message ID if it's a response protocol
+            if let response = result as? any MCPResponseProtocol {
+                logger?.info("HELPER_RESPONSE_PIPE: Successfully decoded response with messageId: \(response.messageId), helperId: \(response.helperId)")
+            } else {
+                logger?.info("HELPER_RESPONSE_PIPE: Successfully decoded \(T.self)")
+            }
+
+            return result
         } catch {
-            logger?.error("Error decoding response: \(error.localizedDescription)")
+            logger?.error("HELPER_RESPONSE_PIPE: Error decoding response: \(error.localizedDescription)")
             throw Error.decodeError(error)
         }
     }
-} 
+}

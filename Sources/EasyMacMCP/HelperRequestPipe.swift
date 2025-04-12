@@ -33,13 +33,19 @@ public actor HelperRequestPipe {
     /// Send a request to the Mac app
     /// - Parameter request: The request to send
     public func sendRequest<Request: MCPRequestProtocol & Encodable>(_ request: Request) async throws {
+        // Log the request details
+        logger?.info("HELPER_REQUEST_PIPE: Sending request - helperId: \(request.helperId), messageId: \(request.messageId)")
+
         let encoder = JSONEncoder()
         let jsonData: Data
 
         do {
             jsonData = try encoder.encode(request)
+            if let jsonString = String(data: jsonData, encoding: .utf8) {
+                logger?.info("HELPER_REQUEST_PIPE: Encoded request: \(jsonString)")
+            }
         } catch {
-            logger?.error("Error encoding request: \(error.localizedDescription)")
+            logger?.error("HELPER_REQUEST_PIPE: Error encoding request: \(error.localizedDescription)")
             throw Error.encodeError(error)
         }
 
@@ -49,23 +55,24 @@ public actor HelperRequestPipe {
 
         do {
             try await writePipe.write(data)
+            logger?.info("HELPER_REQUEST_PIPE: Request successfully sent to pipe")
         } catch {
-            logger?.error("Error sending request: \(error.localizedDescription)")
+            logger?.error("HELPER_REQUEST_PIPE: Error sending request: \(error.localizedDescription)")
             throw Error.sendError(error)
         }
     }
-    
+
     /// Send a string to the Mac app
     /// - Parameter string: The string to send
     public func sendString(_ string: String) async throws {
         guard let data = string.data(using: .utf8) else {
             throw Error.encodeError(NSError(domain: "HelperRequestPipe", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to encode string as UTF-8"]))
         }
-        
+
         // Ensure we have a newline at the end for parsing on the other side
         var newlineData = data
         newlineData.append(10) // newline character
-        
+
         do {
             try await writePipe.write(newlineData)
         } catch {
@@ -73,4 +80,4 @@ public actor HelperRequestPipe {
             throw Error.sendError(error)
         }
     }
-} 
+}

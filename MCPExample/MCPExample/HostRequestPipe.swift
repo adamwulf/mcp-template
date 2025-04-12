@@ -77,12 +77,16 @@ actor HostRequestPipe {
             return nil
         }
 
+        logger?.info("HOST_REQUEST_PIPE: Raw request: \(string)")
+
         do {
             let decoder = JSONDecoder()
-            return try decoder.decode(MCPRequest.self, from: Data(string.utf8))
+            let request = try decoder.decode(MCPRequest.self, from: Data(string.utf8))
+            logger?.info("HOST_REQUEST_PIPE: Successfully decoded request from helper \(request.helperId) with messageId: \(request.messageId)")
+            return request
         } catch {
-            logger?.error("Error decoding request: \(error.localizedDescription)")
+            logger?.error("HOST_REQUEST_PIPE: Error decoding request: \(error.localizedDescription)")
             throw Error.decodeError(error)
         }
     }
-} 
+}

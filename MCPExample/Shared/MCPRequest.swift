@@ -28,10 +28,12 @@ public enum MCPRequest: MCPRequestProtocol {
     }
 
     /// Returns the messageId for this tool request
-    public var messageId: String? {
+    public var messageId: String {
         switch self {
-        case .initialize: return nil
-        case .deinitialize: return nil
+        case .initialize(let helperId):
+            return "init_\(helperId)"
+        case .deinitialize(let helperId):
+            return "deinit_\(helperId)"
         case .helloWorld(_, let messageId):
             return messageId
         case .helloPerson(_, let messageId, _):

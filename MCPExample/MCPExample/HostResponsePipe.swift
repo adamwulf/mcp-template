@@ -27,7 +27,7 @@ actor HostResponsePipe {
     init(helperId: String, logger: Logger? = nil) throws {
         self.helperId = helperId
         self.logger = logger
-        
+
         let url = PipeConstants.helperResponsePipePath(helperId: helperId)
         self.writePipe = try WritePipe(url: url)
     }
@@ -45,13 +45,18 @@ actor HostResponsePipe {
     /// Send a response to the helper
     /// - Parameter response: The MCPResponse to send
     func sendResponse(_ response: MCPResponse) async throws {
+        logger?.info("HOST_RESPONSE_PIPE: Sending response to helper \(helperId) with messageId: \(response.messageId)")
+
         let encoder = JSONEncoder()
         let jsonData: Data
 
         do {
             jsonData = try encoder.encode(response)
+            if let jsonString = String(data: jsonData, encoding: .utf8) {
+                logger?.info("HOST_RESPONSE_PIPE: Encoded response: \(jsonString)")
+            }
         } catch {
-            logger?.error("Error encoding response: \(error.localizedDescription)")
+            logger?.error("HOST_RESPONSE_PIPE: Error encoding response: \(error.localizedDescription)")
             throw Error.encodeError(error)
         }
 
@@ -61,9 +66,10 @@ actor HostResponsePipe {
 
         do {
             try await writePipe.write(data)
+            logger?.info("HOST_RESPONSE_PIPE: Response successfully sent to pipe")
         } catch {
-            logger?.error("Error sending response: \(error.localizedDescription)")
+            logger?.error("HOST_RESPONSE_PIPE: Error sending response: \(error.localizedDescription)")
             throw Error.sendError(error)
         }
     }
-} 
+}

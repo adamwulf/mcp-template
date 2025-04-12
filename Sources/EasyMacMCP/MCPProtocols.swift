@@ -7,7 +7,7 @@ public protocol MCPRequestProtocol: Codable, Sendable, CaseIterable {
     var helperId: String { get }
 
     /// Returns the message ID for this request if applicable
-    var messageId: String? { get }
+    var messageId: String { get }
 
     /// Returns the tool metadata for this specific request case
     var toolMetadata: ToolMetadata? { get }

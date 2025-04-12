@@ -207,6 +207,7 @@ public final class EasyMacMCP<Request: MCPRequestProtocol, Response: MCPResponse
             do {
                 // Generate a message ID for this request
                 let messageId = UUID().uuidString
+                logger?.info("HELPER: Generated message ID: \(messageId) for tool: \(params.name)")
 
                 // Create a request using the Request.create static method
                 let request = try Request.create(
@@ -215,16 +216,26 @@ public final class EasyMacMCP<Request: MCPRequestProtocol, Response: MCPResponse
                     parameters: params
                 )
 
+                // Log the request object
+                if let requestData = try? JSONEncoder().encode(request),
+                   let requestString = String(data: requestData, encoding: .utf8) {
+                    logger?.info("HELPER: Sending request: \(requestString)")
+                }
+
                 // Send the request through the pipe
                 try await self.requestPipe.sendRequest(request)
+                logger?.info("HELPER: Request sent with messageId: \(messageId)")
 
                 // Wait for the response with a timeout
                 let timeout: TimeInterval = 10.0 // 10 second timeout
+                logger?.info("HELPER: Waiting for response with messageId: \(messageId)")
                 let response = try await self.responseManager.waitForResponse(
                     helperId: self.helperId,
                     messageId: messageId,
                     timeout: timeout
                 )
+
+                logger?.info("HELPER: Received response with messageId: \(response.messageId)")
 
                 // Convert the response to the MCP.CallTool.Result format using the response's own method
                 return response.asResult()

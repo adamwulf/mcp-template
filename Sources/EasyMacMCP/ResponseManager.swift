@@ -51,25 +51,28 @@ public actor ResponseManager<Response: MCPResponseProtocol> {
 
         responseReaderTask = Task {
             do {
+                logger?.info("RESPONSE_READER: Started reading from pipe")
                 while !Task.isCancelled {
                     if let line = try await responsePipe.readLine() {
+                        logger?.info("RESPONSE_READER: Raw response received: \(line)")
                         // Try to decode the response directly to the Response type
                         if let responseData = line.data(using: .utf8) {
                             do {
                                 let decoder = JSONDecoder()
                                 let response = try decoder.decode(Response.self, from: responseData)
-                                logger?.debug("Received response: \(response)")
+                                logger?.info("RESPONSE_READER: Successfully decoded response with messageId: \(response.messageId), helperId: \(response.helperId)")
                                 handleResponse(response)
                             } catch {
-                                logger?.error("Failed to decode response: \(error)")
+                                logger?.error("RESPONSE_READER: Failed to decode response: \(error)")
+                                logger?.error("RESPONSE_READER: Raw data: \(line)")
                             }
                         } else {
-                            logger?.error("Failed to convert response to data: \(line)")
+                            logger?.error("RESPONSE_READER: Failed to convert response to data: \(line)")
                         }
                     }
                 }
             } catch {
-                logger?.error("Error in response reader: \(error)")
+                logger?.error("RESPONSE_READER: Error in response reader: \(error)")
             }
         }
     }
@@ -93,13 +96,16 @@ public actor ResponseManager<Response: MCPResponseProtocol> {
     /// - Throws: ResponseError if the request times out or is cancelled
     public func waitForResponse(helperId: String, messageId: String, timeout: TimeInterval = 5.0) async throws -> Response {
         let requestKey = "\(helperId):\(messageId)"
+        logger?.info("RESPONSE_MANAGER: Waiting for response with key: \(requestKey)")
 
         return try await withCheckedThrowingContinuation { continuation in
             pendingRequests[requestKey] = continuation
+            logger?.info("RESPONSE_MANAGER: Added continuation for key: \(requestKey)")
 
             // Setup timeout
             Task {
                 try await Task.sleep(for: .seconds(timeout))
+                logger?.info("RESPONSE_MANAGER: Timeout occurred for key: \(requestKey)")
                 await timeoutRequest(helperId: helperId, messageId: messageId)
             }
         }
@@ -109,12 +115,21 @@ public actor ResponseManager<Response: MCPResponseProtocol> {
     /// - Parameter response: The response to process
     private func handleResponse(_ response: Response) {
         let messageId = response.messageId
+        let helperId = response.helperId
+        let requestKey = "\(helperId):\(messageId)"
 
-        let requestKey = "\(response.helperId):\(messageId)"
+        logger?.info("RESPONSE_MANAGER: Received response with key: \(requestKey)")
+
+        // Log all pending request keys for debugging
+        let pendingKeys = pendingRequests.keys.joined(separator: ", ")
+        logger?.info("RESPONSE_MANAGER: Current pending keys: [\(pendingKeys)]")
+
         guard let continuation = pendingRequests.removeValue(forKey: requestKey) else {
+            logger?.error("RESPONSE_MANAGER: No pending request found for key: \(requestKey)")
             return // No waiting continuation for this response
         }
 
+        logger?.info("RESPONSE_MANAGER: Found and resuming continuation for key: \(requestKey)")
         continuation.resume(returning: response)
     }
 
