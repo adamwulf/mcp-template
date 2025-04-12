@@ -173,9 +173,10 @@ public final class EasyMacMCP<Request: MCPRequestProtocol, Response: MCPResponse
 
     // MARK: - Tools
 
-    /// Automatically register all tools from Request.allCases
+    /// Collect available tools from Request.allCases
     private func registerToolsFromCases() async throws {
-        guard let server = server else { return }
+        // Clear any existing tools
+        tools.removeAll()
 
         // Collect valid tools from Request.allCases
         let validTools = Request.allCases.compactMap { requestCase -> (String, ToolMetadata)? in
@@ -183,9 +184,10 @@ public final class EasyMacMCP<Request: MCPRequestProtocol, Response: MCPResponse
             return (metadata.name, metadata)
         }
 
-        // Register each unique tool (using a dictionary to ensure uniqueness by name)
+        // Create tool registrations (using a dictionary to ensure uniqueness by name)
         let toolDict = Dictionary(validTools) { first, _ in first }
 
+        // Create all the tool registrations
         for (toolName, metadata) in toolDict {
             let schema: Value = metadata.inputSchema ?? ["type": "object", "properties": [:]]
 
@@ -197,63 +199,11 @@ public final class EasyMacMCP<Request: MCPRequestProtocol, Response: MCPResponse
 
             // Store the tool registration
             tools[toolName] = ToolRegistration(tool: tool, name: toolName)
-
-            // Create a sendable copy of the tool name for the closure
-            let toolNameCopy = toolName
-
-            // Register the tool handler
-            await server.withMethodHandler(MCP.CallTool.self) { [weak self] params in
-                guard let self = self else {
-                    return MCP.CallTool.Result(
-                        content: [.text("Service unavailable")],
-                        isError: true
-                    )
-                }
-
-                // Only handle calls to this specific tool
-                guard params.name == toolNameCopy else {
-                    return MCP.CallTool.Result(
-                        content: [.text("Tool not found or not handled by this server")],
-                        isError: true
-                    )
-                }
-
-                do {
-                    // Generate a message ID for this request
-                    let messageId = UUID().uuidString
-
-                    // Create a request using the Request.create static method
-                    let request = try Request.create(
-                        helperId: self.helperId,
-                        messageId: messageId,
-                        parameters: params
-                    )
-
-                    // Send the request through the pipe
-                    try await self.requestPipe.sendRequest(request)
-
-                    // Wait for the response with a timeout
-                    let timeout: TimeInterval = 10.0 // 10 second timeout
-                    let response = try await self.responseManager.waitForResponse(
-                        helperId: self.helperId,
-                        messageId: messageId,
-                        timeout: timeout
-                    )
-
-                    // Convert the response to the MCP.CallTool.Result format using the response's own method
-                    return response.asResult()
-                } catch {
-                    return MCP.CallTool.Result(
-                        content: [.text("Error executing tool: \(error)")],
-                        isError: true
-                    )
-                }
-            }
         }
 
         // Notify clients if tools were registered and the server is running
         if !tools.isEmpty && isRunning {
-            try await server.notify(ToolListChangedNotification.message())
+            try await server?.notify(ToolListChangedNotification.message())
         }
     }
 
@@ -272,6 +222,55 @@ public final class EasyMacMCP<Request: MCPRequestProtocol, Response: MCPResponse
             // Return our registered tools
             let allTools = Array(self.tools.values.map { $0.tool })
             return MCP.ListTools.Result(tools: allTools)
+        }
+
+        // Register a single CallTool handler for all tools
+        await server.withMethodHandler(MCP.CallTool.self) { [weak self] params in
+            guard let self = self else {
+                return MCP.CallTool.Result(
+                    content: [.text("Service unavailable")],
+                    isError: true
+                )
+            }
+
+            // Check if we have this tool registered
+            guard self.tools[params.name] != nil else {
+                return MCP.CallTool.Result(
+                    content: [.text("Tool not found: \(params.name)")],
+                    isError: true
+                )
+            }
+
+            do {
+                // Generate a message ID for this request
+                let messageId = UUID().uuidString
+
+                // Create a request using the Request.create static method
+                let request = try Request.create(
+                    helperId: self.helperId,
+                    messageId: messageId,
+                    parameters: params
+                )
+
+                // Send the request through the pipe
+                try await self.requestPipe.sendRequest(request)
+
+                // Wait for the response with a timeout
+                let timeout: TimeInterval = 10.0 // 10 second timeout
+                let response = try await self.responseManager.waitForResponse(
+                    helperId: self.helperId,
+                    messageId: messageId,
+                    timeout: timeout
+                )
+
+                // Convert the response to the MCP.CallTool.Result format using the response's own method
+                return response.asResult()
+            } catch {
+                return MCP.CallTool.Result(
+                    content: [.text("Error executing tool: \(error)")],
+                    isError: true
+                )
+            }
         }
 
         await server.withMethodHandler(MCP.ListPrompts.self) { _ in
