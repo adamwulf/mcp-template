@@ -13,10 +13,12 @@ public final class EasyMacMCP<Request: MCPRequestProtocol, Response: MCPResponse
         case decodingError
         case timeout
         case noResponse
+        case invalidCase
     }
 
     private struct ToolRegistration {
         let tool: MCP.Tool
+        let name: String
     }
 
     // Internal MCP instance
@@ -41,17 +43,27 @@ public final class EasyMacMCP<Request: MCPRequestProtocol, Response: MCPResponse
     private var responseReaderTask: Task<Void, Never>?
     // Tools with handlers
     private var tools: [String: ToolRegistration] = [:]
+    // Request builder
+    private let requestBuilder: (String, String, [String: Value], String) throws -> Request
 
     /// Initializes a new EasyMacMCP instance
     /// - Parameters:
     ///   - helperId: The unique ID for this helper
     ///   - requestPipe: The pipe to write requests to
     ///   - responsePipe: The pipe to read responses from
+    ///   - requestBuilder: A function that builds a Request from helperId, messageId, arguments, and toolName
     ///   - logger: Optional logger for diagnostics
-    public init(helperId: String, requestPipe: HelperRequestPipe, responsePipe: HelperResponsePipe, logger: Logger? = nil) {
+    public init(
+        helperId: String,
+        requestPipe: HelperRequestPipe,
+        responsePipe: HelperResponsePipe,
+        requestBuilder: @escaping (String, String, [String: Value], String) throws -> Request,
+        logger: Logger? = nil
+    ) {
         self.helperId = helperId
         self.requestPipe = requestPipe
         self.responsePipe = responsePipe
+        self.requestBuilder = requestBuilder
         self.logger = logger
         self.responseManager = ResponseManager()
 
@@ -84,7 +96,10 @@ public final class EasyMacMCP<Request: MCPRequestProtocol, Response: MCPResponse
         let stdioTransport = MCP.StdioTransport(logger: logger)
         self.transport = stdioTransport
 
-        // Register tool handlers
+        // Register tools automatically based on Request.allCases
+        try await registerToolsFromCases()
+
+        // Register standard MCP handlers
         await registerTools()
 
         // Open the pipes
@@ -163,91 +178,92 @@ public final class EasyMacMCP<Request: MCPRequestProtocol, Response: MCPResponse
 
     // MARK: - Tools
 
-    /// Register a tool with the server and set up the pipe-based handler
-    /// - Parameters:
-    ///   - name: Name of the tool
-    ///   - description: Description of what the tool does
-    ///   - inputSchema: JSON schema for the tool's input (optional)
-    ///   - requestBuilder: A function that builds a Request from helperId, messageId, and arguments
-    /// - Returns: Void
-    /// - Throws: Error if registration fails
-    public func registerTool(
-        name: String,
-        description: String,
-        inputSchema: Value? = nil,
-        requestBuilder: @Sendable @escaping (String, String, [String: Value]) -> Request
-    ) async throws {
+    /// Automatically register all tools from Request.allCases
+    private func registerToolsFromCases() async throws {
         guard let server = server else { return }
 
-        let schema: Value
-        if let inputSchema = inputSchema {
-            schema = inputSchema
-        } else {
-            schema = ["type": "object", "properties": [:]]
+        // Collect valid tools from Request.allCases
+        let validTools = Request.allCases.compactMap { requestCase -> (String, ToolMetadata)? in
+            guard let metadata = requestCase.toolMetadata else { return nil }
+            return (metadata.name, metadata)
         }
 
-        let tool = Tool(
-            name: name,
-            description: description,
-            inputSchema: schema
-        )
+        // Register each unique tool (using a dictionary to ensure uniqueness by name)
+        let toolDict = Dictionary(validTools) { first, _ in first }
 
-        // Register the tool with the MCP server
-        await server.withMethodHandler(MCP.CallTool.self) { [weak self] params in
-            guard let self = self else {
-                return MCP.CallTool.Result(
-                    content: [.text("Service unavailable")],
-                    isError: true
-                )
-            }
+        for (toolName, metadata) in toolDict {
+            let schema: Value = metadata.inputSchema ?? ["type": "object", "properties": [:]]
 
-            // Only handle calls to our registered tool
-            guard params.name == name else {
-                return MCP.CallTool.Result(
-                    content: [.text("Tool not found or not handled by this server")],
-                    isError: true
-                )
-            }
+            let tool = Tool(
+                name: metadata.name,
+                description: metadata.description,
+                inputSchema: schema
+            )
 
-            do {
-                // Generate a message ID for this request
-                let messageId = UUID().uuidString
+            // Store the tool registration
+            tools[toolName] = ToolRegistration(tool: tool, name: toolName)
 
-                // Create a request using the provided builder
-                let request = requestBuilder(self.helperId, messageId, params.arguments ?? [:])
+            // Create a sendable copy of the tool name for the closure
+            let toolNameCopy = toolName
 
-                // Send the request through the pipe
-                try await self.requestPipe.sendRequest(request)
+            // Register the tool handler
+            await server.withMethodHandler(MCP.CallTool.self) { [weak self] params in
+                guard let self = self else {
+                    return MCP.CallTool.Result(
+                        content: [.text("Service unavailable")],
+                        isError: true
+                    )
+                }
 
-                // Wait for the response with a timeout
-                let timeout: TimeInterval = 10.0 // 10 second timeout
-                let response = try await self.responseManager.waitForResponse(
-                    helperId: self.helperId,
-                    messageId: messageId,
-                    timeout: timeout
-                )
+                // Only handle calls to this specific tool
+                guard params.name == toolNameCopy else {
+                    return MCP.CallTool.Result(
+                        content: [.text("Tool not found or not handled by this server")],
+                        isError: true
+                    )
+                }
 
-                // Convert the response to the MCP.CallTool.Result format
-                // Extract content from the response - this will need to be customized based on your Response type
-                // For a simple case, we can use String(describing:) or implement a more structured approach
-                return MCP.CallTool.Result(
-                    content: [.text(String(describing: response))],
-                    isError: false
-                )
-            } catch {
-                return MCP.CallTool.Result(
-                    content: [.text("Error executing tool: \(error)")],
-                    isError: true
-                )
+                do {
+                    // Generate a message ID for this request
+                    let messageId = UUID().uuidString
+
+                    // Create a request using the provided builder and the tool name
+                    let request = try self.requestBuilder(
+                        self.helperId,
+                        messageId,
+                        params.arguments ?? [:],
+                        toolNameCopy
+                    )
+
+                    // Send the request through the pipe
+                    try await self.requestPipe.sendRequest(request)
+
+                    // Wait for the response with a timeout
+                    let timeout: TimeInterval = 10.0 // 10 second timeout
+                    let response = try await self.responseManager.waitForResponse(
+                        helperId: self.helperId,
+                        messageId: messageId,
+                        timeout: timeout
+                    )
+
+                    // Convert the response to the MCP.CallTool.Result format
+                    return MCP.CallTool.Result(
+                        content: [.text(String(describing: response))],
+                        isError: false
+                    )
+                } catch {
+                    return MCP.CallTool.Result(
+                        content: [.text("Error executing tool: \(error)")],
+                        isError: true
+                    )
+                }
             }
         }
 
-        if isRunning {
+        // Notify clients if tools were registered and the server is running
+        if !tools.isEmpty && isRunning {
             try await server.notify(ToolListChangedNotification.message())
         }
-
-        // Store the tool registration
-        tools[name] = ToolRegistration(tool: tool)
     }
 
     // MARK: - Private
