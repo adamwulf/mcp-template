@@ -10,82 +10,105 @@ This project aims to create a simple command line executable and Swift package t
 ## Project Structure
 - Package Name: mcp-template
 - Swift Version: 6.0
-- Platforms: macOS 14+
+- Platforms: macOS 15+, iOS 17+, macCatalyst 17+
 
-### EasyMCP Targets:
+### Package Targets:
 1. EasyMCP (Library)
    - Purpose: Swift library for easy integration with the MCP protocol
    - Dependencies: mcp-swift-sdk (MCP module)
    - Key Files: 
-     - Sources/EasyMCP/EasyMCP.swift - Main implementation with basic skeleton
+     - Sources/EasyMCP/EasyMCP.swift - Main implementation that handles MCP server lifecycle, tool registration, and method handlers for listing and calling tools
+     - Sources/EasyMCP/Logging.swift - Utility functions for structured logging with error, warning, and info levels
 
-2. mcpexample (Executable)
+2. EasyMacMCP (Library)
+   - Purpose: Mac-specific implementation for MCP with pipe communication supporting multiple concurrent MCP servers
+   - Dependencies: EasyMCP
+   - Key Files:
+     - Sources/EasyMacMCP/EasyMacMCP.swift - Entry point for macOS-specific MCP utilities that facilitates communication setup between helper processes and Mac app
+     - Sources/EasyMacMCP/MCPTools.swift - Wrapper for MCP tools that manages sending requests through pipes and handles responses with timeouts
+     - Sources/EasyMacMCP/MCPRequest.swift - Defines tool request types (initialize, deinitialize, helloWorld, helloPerson) sent from helpers to app with helperId for server identification
+     - Sources/EasyMacMCP/MCPResponse.swift - Defines response types sent from app back to helpers, with properties to extract helperId and messageId for routing
+     - Sources/EasyMacMCP/MCPResponseReader.swift - Asynchronous reader that continuously reads responses from a server-specific pipe and dispatches them to ResponseManager
+     - Sources/EasyMacMCP/ResponseManager.swift - Actor that coordinates requests and responses, manages timeouts, and resolves async continuations for a specific MCP server
+     - Sources/EasyMacMCP/ReadPipe.swift - Comprehensive implementation for creating, opening, and reading from named pipes with error handling
+     - Sources/EasyMacMCP/WritePipe.swift - Counterpart to ReadPipe for creating, opening, and writing to named pipes with error handling
+     - Sources/EasyMacMCP/PipeProtocols.swift - Defines protocol interfaces for PipeReadable and PipeWritable to allow mocking for testing
+     - Sources/EasyMacMCP/PipeTestHelpers.swift - Utility functions to test pipe writing/reading with synchronous and asynchronous options
+     - Sources/EasyMacMCP/FileManager+Pipe.swift - FileManager extension to check if a URL points to a named pipe using stat() system call
+     - Sources/EasyMacMCP/Logging.swift - Mac-specific logging utilities with error, warning, and info levels that print to stderr/stdout
+     - Sources/EasyMacMCP/MockPipe.swift - Mock implementations of PipeReadable and PipeWritable interfaces for unit testing
+
+3. mcpexample (Executable)
    - Purpose: Command-line example using EasyMCP library
    - Dependencies: EasyMCP, ArgumentParser
    - Key Files:
-     - Sources/mcpexample/main.swift - CLI implementation with ArgumentParser
+     - Sources/mcpexample/MCPExample.swift - CLI implementation with ArgumentParser that demonstrates how to create and register MCP tools
 
-3. EasyMCPTests (Test Target)
+4. EasyMCPTests (Test Target)
    - Purpose: Tests for the EasyMCP library
    - Key Files:
-     - Tests/EasyMCPTests/EasyMCPTests.swift - Test cases for EasyMCP
+     - Tests/EasyMCPTests/EasyMCPTests.swift - Unit tests for the EasyMCP implementation to verify server startup and tool registration
+     - Tests/EasyMCPTests/MCPResponseReaderTests.swift - Tests for MCPResponseReader class
+     - Tests/EasyMCPTests/ResponseManagerTests.swift - Tests for ResponseManager class
+
+5. EasyMacMCPTests (Test Target)
+   - Purpose: Tests for the EasyMacMCP library
+   - Key Files:
+     - Tests/EasyMacMCPTests/MCPToolsTests.swift - Tests for MCPTools that verify hello tools work correctly and handle timeouts
+     - Tests/EasyMacMCPTests/MCPResponseReaderTests.swift - Tests for MCPResponseReader to ensure proper parsing and handling of responses
+     - Tests/EasyMacMCPTests/ResponseManagerTests.swift - Tests for ResponseManager that verify response matching, timeout handling, and cancellation
+     - Tests/EasyMacMCPTests/PipeConstants.swift - Constants for pipe paths used in testing
 
 ### MCPExample Targets:
 
 The MCPExample targets demonstrate:
-  1. How to use EasyMCP to build a functional MCP server (via mcp-helper)
-  2. How to use a running Mac app (MCPExample) as the "brains" of that MCP server
-  3. How to establish bidirectional communication between a GUI app and a command-line MCP server
+  1. How to use EasyMCP and EasyMacMCP to build a functional MCP server (via mcp-helper)
+  2. How to use a running Mac app (MCPExample) as the "brains" that can connect to multiple MCP servers
+  3. How to establish bidirectional communication between a GUI app and multiple command-line MCP servers
 
 1. MCPExample (macOS App)
-   - Purpose: macOS SwiftUI application that demonstrates MCP integration
+   - Purpose: macOS SwiftUI application that demonstrates MCP integration with multiple helpers
+   - Dependencies: EasyMacMCP
    - Key Files:
-     - MCPExample/MCPExample/MCPExampleApp.swift - Main app implementation with PipeReader
-     - MCPExample/MCPExample/ContentView.swift - SwiftUI interface
-     - MCPExample/MCPExample/BuildSettings.swift - Shared build configuration
+     - MCPExample/MCPExample/MCPExampleApp.swift - Main app implementation with DebugHelperPipeReader that detects new MCP server connections
+     - MCPExample/MCPExample/ContentView.swift - SwiftUI interface with controls to test pipe communication and display messages
+     - MCPExample/MCPExample/BuildSettings.swift - Shared build configuration including app group identifier for shared container access
 
 2. mcp-helper (Command Line Tool)
-   - Purpose: Background helper process that runs the actual MCP server
-   - Dependencies: EasyMCP, ArgumentParser
+   - Purpose: Background helper process that runs the actual MCP server (can be launched multiple times)
+   - Dependencies: EasyMacMCP, ArgumentParser
    - Key Files:
-     - MCPExample/mcp-helper/MCPHelper.swift - Command line implementation
-     - MCPExample/mcp-helper/BuildSettings.swift - Shared build configuration
+     - MCPExample/mcp-helper/MCPHelper.swift - Command line implementation that initializes EasyMacMCP communication with a unique helperId and runs the MCP server
+     - MCPExample/mcp-helper/BuildSettings.swift - Shared build configuration with constants for app group identifier and bundle IDs
+     - MCPExample/mcp-helper/HelperPipes.swift - Helper class that manages communication between the helper and the Mac app
 
 3. Shared Folder (Common Code)
    - Purpose: Contains code shared between MCPExample and mcp-helper
    - Located at: MCPExample/Shared/
    - Key Files:
-     - ReadPipe.swift, WritePipe.swift - Core pipe communication classes
-     - PipeTestHelpers.swift - Testing utilities for pipe communication
-     - PipeConstants.swift - Shared constants for pipe paths
-     - Logging.swift - Common logging functionality
-     - FileManager+Pipe.swift - FileManager extension for pipe operations
+     - PipeConstants.swift - Utility that provides URL paths for the shared request pipe and functions to generate server-specific response pipe paths
 
 ### Dependencies:
 - swift-argument-parser (1.3.0+) - Used for CLI argument handling
-- mcp-swift-sdk (main branch) - Core MCP implementation from loopwork-ai
+- mcp-swift-sdk (main branch) - Core MCP implementation from modelcontextprotocol/swift-sdk
 
 ### Current Implementation Status:
-- Basic package structure is set up
-- Minimal implementation with placeholders
-- Command line hello example is working
-- No actual MCP functionality implemented yet
-
-## Main Workspace: mcp-template
-- A basic Swift package template using Swift 6.0
-- Currently minimal with no implementation code
-- Located at: /Users/adamwulf/Developer/swift-packages/mcp-template
+- Package structure fully implemented with EasyMCP and EasyMacMCP targets
+- Pipe communication mechanism working for single server connection
+- Requires update to support multiple concurrent MCP servers following the hub-and-spoke model
+- Basic MCP functionality implemented with helloWorld and helloPerson examples
+- MCPExample demonstrates bidirectional communication between GUI and MCP server
 
 ## Communication Mechanism
 - MCPExample and mcp-helper communicate via named pipes (FIFOs) in a shared app group container
-- This enables inter-process communication between the main app and helper process
-- Access to the pipes is managed through the shared app group container's security context
-
-### MCPExample/Shared Components:
-- A shared code directory containing pipe communication utilities:
-  - ReadPipe.swift - Class for creating and reading from named pipes
-  - WritePipe.swift - Class for creating and writing to named pipes
-  - PipeTestHelpers.swift - Utility class for testing pipe functionality
-  - PipeConstants.swift - Constants for pipe paths in the shared container
-  - Logging.swift - Logging utilities
-  - FileManager+Pipe.swift - FileManager extension for pipe operations
+- The communication follows a hub-and-spoke pattern:
+  - One centralized pipe for all MCP servers to write to the Mac app (many-to-one)
+  - Individual dedicated pipes for the Mac app to respond to each specific MCP server (one-to-many)
+- Flow:
+  1. Each MCP server instance launches with a unique helperId
+  2. The server sends an initialize() request via the shared input pipe to the Mac app
+  3. Mac app receives this request and recognizes the new server by its helperId
+  4. Mac app writes all responses for that specific server to a dedicated pipe named with the helperId
+  5. Each MCP server only reads from its own dedicated response pipe, avoiding contention
+- This architecture enables the Mac app to communicate with multiple MCP server instances simultaneously
+- EasyMacMCP provides the core classes for this communication with request/response handling
