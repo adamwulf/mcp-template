@@ -240,11 +240,8 @@ public final class EasyMacMCP<Request: MCPRequestProtocol, Response: MCPResponse
                         timeout: timeout
                     )
 
-                    // Convert the response to the MCP.CallTool.Result format
-                    return MCP.CallTool.Result(
-                        content: [.text(String(describing: response))],
-                        isError: false
-                    )
+                    // Convert the response to the MCP.CallTool.Result format using the response's own method
+                    return response.asResult()
                 } catch {
                     return MCP.CallTool.Result(
                         content: [.text("Error executing tool: \(error)")],

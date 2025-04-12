@@ -1,5 +1,6 @@
 import Foundation
 import EasyMacMCP
+import MCP
 
 /// Represents responses sent from the main app back to the helper
 public enum MCPResponse: MCPResponseProtocol {
@@ -35,4 +36,28 @@ public enum MCPResponse: MCPResponseProtocol {
             return messageId
         }
     }
-} 
+
+    /// Convert this response to an MCP.CallTool.Result
+    /// - Returns: A properly formatted result for the MCP tool call
+    public func asResult() -> MCP.CallTool.Result {
+        switch self {
+        case .helloWorld(_, _, let result):
+            return MCP.CallTool.Result(
+                content: [.text(result)],
+                isError: false
+            )
+
+        case .helloPerson(_, _, let result):
+            return MCP.CallTool.Result(
+                content: [.text(result)],
+                isError: false
+            )
+
+        case .error(_, _, let message):
+            return MCP.CallTool.Result(
+                content: [.text(message)],
+                isError: true
+            )
+        }
+    }
+}

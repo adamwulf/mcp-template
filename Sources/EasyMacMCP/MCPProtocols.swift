@@ -52,4 +52,8 @@ public protocol MCPResponseProtocol: Codable, Sendable {
 
     /// Returns the message ID for this response
     var messageId: String { get }
+
+    /// Convert this response to an MCP.CallTool.Result
+    /// - Returns: A properly formatted result for the MCP tool call
+    func asResult() -> MCP.CallTool.Result
 }
