@@ -47,10 +47,6 @@ let package = Package(
                 .product(name: "ArgumentParser", package: "swift-argument-parser")
             ]),
         .testTarget(
-            name: "EasyMCPTests",
-            dependencies: ["EasyMCP"]
-        ),
-        .testTarget(
             name: "EasyMacMCPTests",
             dependencies: ["EasyMacMCP"]
         )

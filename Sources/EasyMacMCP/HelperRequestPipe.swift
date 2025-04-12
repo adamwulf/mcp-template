@@ -1,17 +1,9 @@
-//
-//  HelperRequestPipe.swift
-//  MCPExample
-//
-//  Created by Adam Wulf on 4/6/25.
-//
-
 import Foundation
-import EasyMacMCP
 import Logging
 
 /// Actor that wraps a WritePipe for sending requests from helpers to the Mac app
-actor HelperRequestPipe {
-    enum Error: Swift.Error {
+public actor HelperRequestPipe {
+    public enum Error: Swift.Error {
         case encodeError(_ error: Swift.Error)
         case sendError(_ error: Swift.Error)
     }
@@ -23,24 +15,24 @@ actor HelperRequestPipe {
     /// - Parameters:
     ///   - url: URL to the central request pipe
     ///   - logger: Optional logger for debugging
-    init(url: URL, logger: Logger? = nil) throws {
+    public init(url: URL, logger: Logger? = nil) throws {
         self.writePipe = try WritePipe(url: url)
         self.logger = logger
     }
 
     /// Open the pipe for writing
-    func open() async throws {
+    public func open() async throws {
         try await writePipe.open()
     }
 
     /// Close the pipe
-    func close() async {
+    public func close() async {
         await writePipe.close()
     }
 
     /// Send a request to the Mac app
-    /// - Parameter request: The MCPRequest to send
-    func sendRequest(_ request: MCPRequest) async throws {
+    /// - Parameter request: The request to send
+    public func sendRequest<Request: MCPRequestProtocol & Encodable>(_ request: Request) async throws {
         let encoder = JSONEncoder()
         let jsonData: Data
 
@@ -62,4 +54,23 @@ actor HelperRequestPipe {
             throw Error.sendError(error)
         }
     }
-}
+    
+    /// Send a string to the Mac app
+    /// - Parameter string: The string to send
+    public func sendString(_ string: String) async throws {
+        guard let data = string.data(using: .utf8) else {
+            throw Error.encodeError(NSError(domain: "HelperRequestPipe", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to encode string as UTF-8"]))
+        }
+        
+        // Ensure we have a newline at the end for parsing on the other side
+        var newlineData = data
+        newlineData.append(10) // newline character
+        
+        do {
+            try await writePipe.write(newlineData)
+        } catch {
+            logger?.error("Error sending string: \(error.localizedDescription)")
+            throw Error.sendError(error)
+        }
+    }
+} 
