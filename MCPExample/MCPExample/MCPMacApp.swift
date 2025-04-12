@@ -39,7 +39,10 @@ final class MCPMacApp: ObservableObject, Sendable {
 
                 // Start reading requests
                 await pipe.startReading { [weak self] request in
-                    self?.handleRequest(request)
+                    guard let self = self else { return }
+                    Task {
+                        await self.handleRequest(request)
+                    }
                 }
             } catch {
                 print("Error setting up request pipe: \(error)")
@@ -47,7 +50,7 @@ final class MCPMacApp: ObservableObject, Sendable {
         }
     }
 
-    private func handleRequest(_ request: MCPRequest) {
+    private func handleRequest(_ request: MCPRequest) async {
         // Extract helper ID from the request
         let helperId = request.helperId
 
@@ -56,47 +59,104 @@ final class MCPMacApp: ObservableObject, Sendable {
         switch request {
         case .initialize:
             requestDescription = "Initialize request from helper: \(helperId)"
+            // Setup response pipe only for initialize requests
+            await setupResponsePipe(for: helperId)
         case .deinitialize:
             requestDescription = "Deinitialize request from helper: \(helperId)"
-        case .helloWorld:
+            // Teardown response pipe for this helper
+            await teardownResponsePipe(for: helperId)
+        case .helloWorld(let messageId, _):
             requestDescription = "HelloWorld request from helper: \(helperId)"
-        case .helloPerson(_, _, let name):
+            // Send response for helloWorld
+            await sendHelloWorldResponse(helperId: helperId, messageId: messageId)
+        case .helloPerson(let messageId, _, let name):
             requestDescription = "HelloPerson request from helper: \(helperId) with name: \(name)"
+            // Send response for helloPerson
+            await sendHelloPersonResponse(helperId: helperId, messageId: messageId, name: name)
         }
 
         DispatchQueue.main.async {
             self.messages.append(requestDescription)
         }
         print(requestDescription)
-
-        // Setup response pipe for this helper if needed
-        setupResponsePipe(for: helperId)
     }
 
-    private func setupResponsePipe(for helperId: String) {
+    private func setupResponsePipe(for helperId: String) async {
         // Only create a new response pipe if we don't already have one for this helper
         if responsePipes[helperId] == nil {
-            Task {
-                do {
-                    print("Setting up response pipe for helper \(helperId)")
+            do {
+                print("Setting up response pipe for helper \(helperId)")
 
-                    // Create the response pipe for this specific helper
-                    let responsePipe = try HostResponsePipe(helperId: helperId, logger: logger)
+                // Create the response pipe for this specific helper
+                let responsePipe = try HostResponsePipe(helperId: helperId, logger: logger)
 
-                    // Open the pipe
-                    try await responsePipe.open()
+                // Open the pipe
+                try await responsePipe.open()
 
-                    // Store it in our dictionary
-                    responsePipes[helperId] = responsePipe
+                // Store it in our dictionary
+                responsePipes[helperId] = responsePipe
 
-                    print("Response pipe for helper \(helperId) created successfully")
+                print("Response pipe for helper \(helperId) created successfully")
 
-                    // If this is an initialize request, we could send a response here
-                    // await responsePipe.sendResponse(MCPResponse.success(helperId: helperId, ...))
-                } catch {
-                    print("Error creating response pipe for helper \(helperId): \(error)")
-                }
+                // If this is an initialize request, we could send a response here
+                // await responsePipe.sendResponse(MCPResponse.success(helperId: helperId, ...))
+            } catch {
+                print("Error creating response pipe for helper \(helperId): \(error)")
             }
+        }
+    }
+
+    private func teardownResponsePipe(for helperId: String) async {
+        guard let pipe = responsePipes[helperId] else { return }
+        
+        print("Closing response pipe for helper \(helperId)")
+        await pipe.close()
+        responsePipes.removeValue(forKey: helperId)
+    }
+
+    private func sendHelloWorldResponse(helperId: String, messageId: String) async {
+        guard let pipe = responsePipes[helperId] else {
+            print("Error: No response pipe for helper \(helperId)")
+            return
+        }
+        
+        do {
+            let response = MCPResponse.helloWorld(
+                helperId: helperId,
+                messageId: messageId,
+                result: "Hello World from Mac app at \(Date())"
+            )
+            
+            try await pipe.sendResponse(response)
+            
+            DispatchQueue.main.async {
+                self.messages.append("Sent helloWorld response to \(helperId)")
+            }
+        } catch {
+            print("Error sending helloWorld response: \(error)")
+        }
+    }
+    
+    private func sendHelloPersonResponse(helperId: String, messageId: String, name: String) async {
+        guard let pipe = responsePipes[helperId] else {
+            print("Error: No response pipe for helper \(helperId)")
+            return
+        }
+        
+        do {
+            let response = MCPResponse.helloPerson(
+                helperId: helperId,
+                messageId: messageId,
+                result: "Hello \(name) from Mac app at \(Date())"
+            )
+            
+            try await pipe.sendResponse(response)
+            
+            DispatchQueue.main.async {
+                self.messages.append("Sent helloPerson response to \(helperId)")
+            }
+        } catch {
+            print("Error sending helloPerson response: \(error)")
         }
     }
 
