@@ -56,7 +56,10 @@ struct RunCommand: AsyncParsableCommand, Decodable {
         let logger = Logger(label: "com.milestonemade.easymcp")
         let mcp = EasyMCP(logger: logger)
 
+        #if DEBUG
+        // Add a 3 second delay to allow time for the debugger to attach when wait-for-executable is checked in the scheme
         try await Task.sleep(for: .seconds(3))
+        #endif
 
         // Use the new PipeTestHelpers to test pipe functionality
         Task {
