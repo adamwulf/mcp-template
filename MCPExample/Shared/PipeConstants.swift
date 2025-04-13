@@ -20,22 +20,4 @@ public enum PipeConstants {
 
         return sharedContainerURL.appendingPathComponent("response_pipe_\(helperId)")
     }
-
-    // For backward compatibility during migration
-
-    /// Path to the pipe for sending messages from helper to app (deprecated)
-    @available(*, deprecated, message: "Use centralRequestPipePath instead")
-    public static func helperToAppPipePath() -> URL {
-        return centralRequestPipePath()
-    }
-
-    /// Path to the pipe for sending messages from app to helper (deprecated)
-    @available(*, deprecated, message: "Use helperResponsePipePath(helperId:) instead")
-    public static func appToHelperPipePath() -> URL {
-        guard let sharedContainerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: BuildSettings.GROUP_IDENTIFIER) else {
-            fatalError("Failed to access app group container: \(BuildSettings.GROUP_IDENTIFIER)")
-        }
-
-        return sharedContainerURL.appendingPathComponent("app_to_helper_pipe")
-    }
 }
