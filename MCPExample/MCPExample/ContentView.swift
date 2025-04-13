@@ -22,11 +22,9 @@ struct ContentView: View {
                 .font(.system(.body, design: .monospaced))
 
             Button("Copy Path") {
-                #if os(macOS)
                 let pasteboard = NSPasteboard.general
                 pasteboard.clearContents()
                 pasteboard.setString(helperPath, forType: .string)
-                #endif
             }
 
             Divider()
