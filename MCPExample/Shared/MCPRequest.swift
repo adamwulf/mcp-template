@@ -100,7 +100,13 @@ public enum MCPRequest: MCPRequestProtocol {
             return .helloWorld(helperId: helperId, messageId: messageId)
 
         case Self.HelloPerson:
-            let name = parameters.arguments?["name"]?.stringValue ?? "Anonymous"
+            guard let name = parameters.arguments?["name"]?.stringValue else {
+                throw NSError(
+                    domain: "MCPRequest",
+                    code: 2,
+                    userInfo: [NSLocalizedDescriptionKey: "Missing argument `name` for tool: \(parameters.name)"]
+                )
+            }
             return .helloPerson(helperId: helperId, messageId: messageId, name: name)
 
         default:
