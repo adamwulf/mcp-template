@@ -31,25 +31,6 @@ struct ContentView: View {
 
             Divider()
 
-            HStack {
-                Button("Test Write to Pipe") {
-                    pipeReader.testWriteToPipe()
-                }
-                .padding(8)
-                .background(Color.blue)
-                .foregroundColor(.white)
-                .cornerRadius(8)
-
-                if !pipeReader.writeStatus.isEmpty {
-                    Text(pipeReader.writeStatus)
-                        .padding(8)
-                        .background(Color.gray.opacity(0.2))
-                        .cornerRadius(8)
-                }
-            }
-
-            Divider()
-
             Text("Pipe Messages")
                 .font(.headline)
 

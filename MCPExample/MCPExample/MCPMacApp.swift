@@ -193,44 +193,4 @@ final class MCPMacApp: ObservableObject, Sendable {
         }
         responsePipes.removeAll()
     }
-
-    func testWriteToPipe() {
-        // Clear previous status
-        writeStatus = "Sending test message..."
-
-        // Check if we have any helpers connected
-        guard !responsePipes.isEmpty else {
-            writeStatus = "No helpers connected. Launch mcp-helper first."
-            return
-        }
-
-        // Pick the first helper or a random one
-        let randomHelperId = responsePipes.keys.randomElement()!
-
-        Task {
-            do {
-                // Create a test response
-                let messageId = UUID().uuidString
-                let response = MCPResponse.helloWorld(
-                    helperId: randomHelperId,
-                    messageId: messageId,
-                    result: "Test message from Mac app at \(Date())"
-                )
-
-                // Send the response
-                try await responsePipes[randomHelperId]?.sendResponse(response)
-
-                // Update status on success
-                DispatchQueue.main.async {
-                    self.writeStatus = "Message sent successfully to helper: \(randomHelperId)"
-                    self.messages.append("Sent helloWorld to \(randomHelperId)")
-                }
-            } catch {
-                // Update status on failure
-                DispatchQueue.main.async {
-                    self.writeStatus = "Error: \(error.localizedDescription)"
-                }
-            }
-        }
-    }
 }
