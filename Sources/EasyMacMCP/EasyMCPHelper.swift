@@ -5,7 +5,7 @@ import Logging
 
 /// A class for handling MCP communications with Mac-specific request/response protocols
 @available(macOS 14.0, *)
-public final class EasyMacMCP<Request: MCPRequestProtocol, Response: MCPResponseProtocol>: @unchecked Sendable {
+public final class EasyMCPHelper<Request: MCPRequestProtocol, Response: MCPResponseProtocol>: @unchecked Sendable {
 
     public enum Error: Swift.Error {
         case serverHasNotStarted

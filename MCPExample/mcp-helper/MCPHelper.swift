@@ -64,8 +64,8 @@ struct RunCommand: AsyncParsableCommand, Decodable {
     }
 
     func run() async throws {
-        // Create EasyMacMCP server
-        let mcpServer = EasyMacMCP<MCPRequest, MCPResponse>(
+        // Create EasyMCPHelper server
+        let mcpServer = EasyMCPHelper<MCPRequest, MCPResponse>(
             helperId: helperId,
             requestPipe: requestPipe,
             responsePipe: responsePipe,
