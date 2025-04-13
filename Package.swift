@@ -15,6 +15,9 @@ let package = Package(
         .library(
             name: "EasyMCP",
             targets: ["EasyMCP"]),
+        .library(
+            name: "EasyMacMCP",
+            targets: ["EasyMacMCP"]),
         .executable(
             name: "mcpexample",
             targets: ["mcpexample"])
@@ -32,6 +35,11 @@ let package = Package(
             dependencies: [
                 .product(name: "MCP", package: "swift-sdk")
             ]),
+        .target(
+            name: "EasyMacMCP",
+            dependencies: [
+                "EasyMCP"
+            ]),
         .executableTarget(
             name: "mcpexample",
             dependencies: [
@@ -39,8 +47,8 @@ let package = Package(
                 .product(name: "ArgumentParser", package: "swift-argument-parser")
             ]),
         .testTarget(
-            name: "EasyMCPTests",
-            dependencies: ["EasyMCP"]
+            name: "EasyMacMCPTests",
+            dependencies: ["EasyMacMCP"]
         )
     ]
 )

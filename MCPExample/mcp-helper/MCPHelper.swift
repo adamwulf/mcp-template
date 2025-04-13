@@ -1,7 +1,9 @@
 import Foundation
 import ArgumentParser
-import EasyMCP
 import Logging
+import EasyMacMCP
+import EasyMCP
+import MCP
 
 @main
 struct MCPHelper: AsyncParsableCommand {
@@ -15,87 +17,86 @@ struct MCPHelper: AsyncParsableCommand {
     )
 }
 
-@available(macOS 14.0, *)
-struct RunCommand: AsyncParsableCommand {
+struct RunCommand: AsyncParsableCommand, Decodable {
     static let configuration = CommandConfiguration(
         commandName: "run",
         abstract: "Start the MCP server to handle MCP protocol communications"
     )
 
-    func run() async throws {
-        // build server
-        let logger = Logger(label: "com.milestonemade.easymcp")
-        let mcp = EasyMCP(logger: logger)
+    enum CodingKeys: String, CodingKey {
+        case helperId
+    }
 
+    // Unique identifier for this helper instance
+    private let helperId: String
+    private let logger = Logger(label: "com.milestonemade.easymcp")
+
+    // Pipe for sending requests to the Mac app
+    private var requestPipe: HelperRequestPipe
+
+    // Pipe for receiving responses from the Mac app
+    private var responsePipe: HelperResponsePipe
+
+    init() {
+        helperId = UUID().uuidString
+        requestPipe = try! HelperRequestPipe(
+            url: PipeConstants.centralRequestPipePath(),
+            logger: logger
+        )
+        responsePipe = try! HelperResponsePipe(
+            url: PipeConstants.helperResponsePipePath(helperId: helperId),
+            logger: logger
+        )
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        helperId = try container.decode(String.self, forKey: .helperId)
+        requestPipe = try HelperRequestPipe(
+            url: PipeConstants.centralRequestPipePath(),
+            logger: logger
+        )
+        responsePipe = try HelperResponsePipe(
+            url: PipeConstants.helperResponsePipePath(helperId: helperId),
+            logger: logger
+        )
+    }
+
+    func run() async throws {
+        // Create EasyMCPHelper server
+        let mcpServer = EasyMCPHelper<MCPRequest, MCPResponse>(
+            helperId: helperId,
+            requestPipe: requestPipe,
+            responsePipe: responsePipe,
+            logger: logger
+        )
+
+        #if DEBUG
+        // Add a 3 second delay to allow time for the debugger to attach when wait-for-executable is checked in the scheme
         try await Task.sleep(for: .seconds(3))
+        #endif
 
         // Set up signal handling to gracefully exit
         let signalSource = DispatchSource.makeSignalSource(signal: SIGINT, queue: .main)
         signal(SIGINT, SIG_IGN)
         signalSource.setEventHandler {
             Task {
-                await mcp.stop()
+                await mcpServer.stop()
                 RunCommand.exit()
             }
         }
         signalSource.resume()
 
-        // Register a simple tool with no input
-        try await mcp.register(tool: Tool(
-            name: "helloWorld",
-            description: "Returns a friendly greeting message"
-        )) { input in
-            return Result(content: [.text(helloworld())], isError: false)
-        }
+        // Start the server - this will automatically register tools from MCPRequest.allCases
+        try await mcpServer.start()
 
-        // Register a simple tool that accepts a single parameter
-        try await mcp.register(tool: Tool(
-            name: "helloPerson",
-            description: "Returns a friendly greeting message",
-            inputSchema: [
-                "type": "object",
-                "properties": [
-                    "name": [
-                        "type": "string",
-                        "description": "Name to search for (will match given name or family name)",
-                    ]
-                ]
-            ]
-        )) { input in
-            return Result(content: [.text(hello(input["name"]?.stringValue ?? "world"))], isError: false)
-        }
-
-        // Start the server and keep it running
-        try await mcp.start()
-
-        Task {
-            try await Task.sleep(for: .seconds(30))
-            logger.info("registering extra tool")
-
-            do {
-                // Register a simple tool with no input
-                try await mcp.register(tool: Tool(
-                    name: "helloEveryone",
-                    description: "Returns a friendly greeting message to everyone around"
-                )) { input in
-                    return Result(content: [.text(helloworld())], isError: false)
-                }
-                logger.info("registered extra tool")
-            } catch {
-                logger.error("failed registering extra tool: \(error)")
-            }
-        }
+        // Send the initialize message to notify the Mac app about this helper
+        try await requestPipe.sendRequest(MCPRequest.initialize(helperId: helperId))
 
         // Wait until the server is finished processing all input
-        try await mcp.waitUntilComplete()
-    }
+        try await mcpServer.waitUntilComplete()
 
-    /// A simple example method
-    public func helloworld() -> String {
-        return "Hello iOS Folks! MCP SDK is configured and ready."
-    }
-
-    public func hello(_ name: String) -> String {
-        return "Hello \(name)! MCP SDK is configured and ready."
+        // Clean up - send deinitialize message before exiting
+        try await requestPipe.sendRequest(MCPRequest.deinitialize(helperId: helperId))
     }
 }

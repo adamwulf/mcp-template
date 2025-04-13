@@ -7,10 +7,17 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		C50BB13C2DA9F24E0094A152 /* EasyMCP in Frameworks */ = {isa = PBXBuildFile; productRef = C50BB13B2DA9F24E0094A152 /* EasyMCP */; };
+		C50BB13E2DA9F24E0094A152 /* EasyMacMCP in Frameworks */ = {isa = PBXBuildFile; productRef = C50BB13D2DA9F24E0094A152 /* EasyMacMCP */; };
+		C50BB18E2DA9F3870094A152 /* EasyMacMCP in Frameworks */ = {isa = PBXBuildFile; productRef = C50BB18D2DA9F3870094A152 /* EasyMacMCP */; };
+		C50BB2632DAAED500094A152 /* MCPResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = C50BB2622DAAED500094A152 /* MCPResponse.swift */; };
+		C50BB2642DAAED500094A152 /* MCPRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = C50BB2612DAAED500094A152 /* MCPRequest.swift */; };
+		C50BB2652DAAED500094A152 /* MCPResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = C50BB2622DAAED500094A152 /* MCPResponse.swift */; };
+		C50BB2662DAAED500094A152 /* MCPRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = C50BB2612DAAED500094A152 /* MCPRequest.swift */; };
 		C55B13A82D87D10B00E77939 /* mcp-helper in Copy Helper Tools */ = {isa = PBXBuildFile; fileRef = C55B139E2D87D0F100E77939 /* mcp-helper */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
-		C55B13B62D87D16600E77939 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = C55B13B52D87D16100E77939 /* README.md */; };
+		C57BC9CC2D9DD7B800D817AD /* PipeConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = C57BC9CB2D9DD7B800D817AD /* PipeConstants.swift */; };
+		C57BC9CD2D9DD7B800D817AD /* PipeConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = C57BC9CB2D9DD7B800D817AD /* PipeConstants.swift */; };
 		C5F326F92D87DC25000D77C6 /* ArgumentParser in Frameworks */ = {isa = PBXBuildFile; productRef = C5F326F82D87DC25000D77C6 /* ArgumentParser */; };
-		C5F326FC2D87DC41000D77C6 /* EasyMCP in Frameworks */ = {isa = PBXBuildFile; productRef = C5F326FB2D87DC41000D77C6 /* EasyMCP */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -47,9 +54,12 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		C50BB2612DAAED500094A152 /* MCPRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPRequest.swift; sourceTree = "<group>"; };
+		C50BB2622DAAED500094A152 /* MCPResponse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPResponse.swift; sourceTree = "<group>"; };
 		C55B135B2D87CDAC00E77939 /* MCPExample.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MCPExample.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C55B139E2D87D0F100E77939 /* mcp-helper */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "mcp-helper"; sourceTree = BUILT_PRODUCTS_DIR; };
 		C55B13B52D87D16100E77939 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
+		C57BC9CB2D9DD7B800D817AD /* PipeConstants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipeConstants.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -63,6 +73,11 @@
 			path = "mcp-helper";
 			sourceTree = "<group>";
 		};
+		C57BC9E02D9E417B00D817AD /* xcconfig */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = xcconfig;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -70,6 +85,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C50BB13C2DA9F24E0094A152 /* EasyMCP in Frameworks */,
+				C50BB13E2DA9F24E0094A152 /* EasyMacMCP in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -78,7 +95,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				C5F326F92D87DC25000D77C6 /* ArgumentParser in Frameworks */,
-				C5F326FC2D87DC41000D77C6 /* EasyMCP in Frameworks */,
+				C50BB18E2DA9F3870094A152 /* EasyMacMCP in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -88,10 +105,12 @@
 		C55B13522D87CDAC00E77939 = {
 			isa = PBXGroup;
 			children = (
+				C55B13B52D87D16100E77939 /* README.md */,
+				C57BC9BE2D9DD3B100D817AD /* Shared */,
 				C55B135D2D87CDAC00E77939 /* MCPExample */,
 				C55B139F2D87D0F100E77939 /* mcp-helper */,
 				C55B135C2D87CDAC00E77939 /* Products */,
-				C55B13B52D87D16100E77939 /* README.md */,
+				C57BC9E02D9E417B00D817AD /* xcconfig */,
 				C5F326FA2D87DC41000D77C6 /* Frameworks */,
 			);
 			sourceTree = "<group>";
@@ -103,6 +122,16 @@
 				C55B139E2D87D0F100E77939 /* mcp-helper */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		C57BC9BE2D9DD3B100D817AD /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				C50BB2612DAAED500094A152 /* MCPRequest.swift */,
+				C50BB2622DAAED500094A152 /* MCPResponse.swift */,
+				C57BC9CB2D9DD7B800D817AD /* PipeConstants.swift */,
+			);
+			path = Shared;
 			sourceTree = "<group>";
 		};
 		C5F326FA2D87DC41000D77C6 /* Frameworks */ = {
@@ -119,6 +148,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = C55B136A2D87CDAE00E77939 /* Build configuration list for PBXNativeTarget "MCPExample" */;
 			buildPhases = (
+				C57BC9D12D9E3F9400D817AD /* Generate BuildSettings */,
 				C55B13572D87CDAC00E77939 /* Sources */,
 				C55B13582D87CDAC00E77939 /* Frameworks */,
 				C55B13592D87CDAC00E77939 /* Resources */,
@@ -131,9 +161,12 @@
 			);
 			fileSystemSynchronizedGroups = (
 				C55B135D2D87CDAC00E77939 /* MCPExample */,
+				C57BC9E02D9E417B00D817AD /* xcconfig */,
 			);
 			name = MCPExample;
 			packageProductDependencies = (
+				C50BB13B2DA9F24E0094A152 /* EasyMCP */,
+				C50BB13D2DA9F24E0094A152 /* EasyMacMCP */,
 			);
 			productName = MCPExample;
 			productReference = C55B135B2D87CDAC00E77939 /* MCPExample.app */;
@@ -143,6 +176,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = C55B13A42D87D0F100E77939 /* Build configuration list for PBXNativeTarget "mcp-helper" */;
 			buildPhases = (
+				C57BC9D22D9E3FD600D817AD /* Generate BuildSettings */,
 				C55B139A2D87D0F100E77939 /* Sources */,
 				C55B139B2D87D0F100E77939 /* Frameworks */,
 				C55B139C2D87D0F100E77939 /* CopyFiles */,
@@ -157,7 +191,7 @@
 			name = "mcp-helper";
 			packageProductDependencies = (
 				C5F326F82D87DC25000D77C6 /* ArgumentParser */,
-				C5F326FB2D87DC41000D77C6 /* EasyMCP */,
+				C50BB18D2DA9F3870094A152 /* EasyMacMCP */,
 			);
 			productName = "mcp-helper";
 			productReference = C55B139E2D87D0F100E77939 /* mcp-helper */;
@@ -191,8 +225,8 @@
 			mainGroup = C55B13522D87CDAC00E77939;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				C55B136D2D87CE7600E77939 /* XCLocalSwiftPackageReference "../../mcp-template" */,
 				C5F326F72D87DC25000D77C6 /* XCRemoteSwiftPackageReference "swift-argument-parser" */,
+				C50BB13A2DA9F24E0094A152 /* XCLocalSwiftPackageReference "../../mcp-template" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = C55B135C2D87CDAC00E77939 /* Products */;
@@ -210,17 +244,72 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				C55B13B62D87D16600E77939 /* README.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		C57BC9D12D9E3F9400D817AD /* Generate BuildSettings */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/xcconfig/MCPExample-Debug.xcconfig",
+				"$(SRCROOT)/xcconfig/MCPExample-Release.xcconfig",
+				"$(SRCROOT)/xcconfig/MCPExample-Shared.xcconfig",
+				"$(SRCROOT)/xcconfig/Project-Debug.xcconfig",
+				"$(SRCROOT)/xcconfig/Project-Release.xcconfig",
+				"$(SRCROOT)/xcconfig/Project-Shared.xcconfig",
+			);
+			name = "Generate BuildSettings";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(SRCROOT)/MCPExample/BuildSettings.swift",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "outputfile=\"${SRCROOT}/MCPExample/BuildSettings.swift\"\n\nproperties=(\n    \"GROUP_IDENTIFIER\"\n    \"PARENT_BUNDLE_IDENTIFIER\"\n    \"PRODUCT_BUNDLE_IDENTIFIER\"\n)\n\necho \"\" > \"$outputfile\"\necho \"// DO NOT EDIT. This file is auto-generated.\" > \"$outputfile\"\necho \"enum BuildSettings {\" >> \"$outputfile\"\n\necho \"    #if DEBUG\" >> \"$outputfile\"\necho \"    static let ENVIRONMENT = \\\"Debug\\\"\" >> \"$outputfile\"\necho \"    #else\" >> \"$outputfile\"\necho \"    static let ENVIRONMENT = \\\"Release\\\"\" >> \"$outputfile\"\necho \"    #endif\" >> \"$outputfile\"\n\nfor property in \"${properties[@]}\"\ndo\n    value=$(eval \"echo \\$$property\")\n    echo \"    static let $property = \\\"$value\\\"\" >> \"$outputfile\"\ndone\n#echo \"    static let PRODUCT_BUNDLE_IDENTIFIER = \\\"${PRODUCT_BUNDLE_IDENTIFIER}\\\"\" >> \"$outputfile\"\n#echo \"    static let GROUP_IDENTIFIER = \\\"${GROUP_IDENTIFIER}\\\"\" >> \"$outputfile\"\necho \"}\" >> \"$outputfile\"\n";
+		};
+		C57BC9D22D9E3FD600D817AD /* Generate BuildSettings */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/xcconfig/mcp-helper-Debug.xcconfig",
+				"$(SRCROOT)/xcconfig/mcp-helper-Release.xcconfig",
+				"$(SRCROOT)/xcconfig/mcp-helper-Shared.xcconfig",
+				"$(SRCROOT)/xcconfig/Project-Debug.xcconfig",
+				"$(SRCROOT)/xcconfig/Project-Release.xcconfig",
+				"$(SRCROOT)/xcconfig/Project-Shared.xcconfig",
+			);
+			name = "Generate BuildSettings";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(SRCROOT)/mcp-helper/BuildSettings.swift",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "outputfile=\"${SRCROOT}/mcp-helper/BuildSettings.swift\"\n\nproperties=(\n    \"GROUP_IDENTIFIER\"\n    \"PARENT_BUNDLE_IDENTIFIER\"\n    \"PRODUCT_BUNDLE_IDENTIFIER\"\n)\n\necho \"\" > \"$outputfile\"\necho \"// DO NOT EDIT. This file is auto-generated.\" > \"$outputfile\"\necho \"enum BuildSettings {\" >> \"$outputfile\"\n\necho \"    #if DEBUG\" >> \"$outputfile\"\necho \"    static let ENVIRONMENT = \\\"Debug\\\"\" >> \"$outputfile\"\necho \"    #else\" >> \"$outputfile\"\necho \"    static let ENVIRONMENT = \\\"Release\\\"\" >> \"$outputfile\"\necho \"    #endif\" >> \"$outputfile\"\n\nfor property in \"${properties[@]}\"\ndo\n    value=$(eval \"echo \\$$property\")\n    echo \"    static let $property = \\\"$value\\\"\" >> \"$outputfile\"\ndone\n#echo \"    static let PRODUCT_BUNDLE_IDENTIFIER = \\\"${PRODUCT_BUNDLE_IDENTIFIER}\\\"\" >> \"$outputfile\"\n#echo \"    static let GROUP_IDENTIFIER = \\\"${GROUP_IDENTIFIER}\\\"\" >> \"$outputfile\"\necho \"}\" >> \"$outputfile\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		C55B13572D87CDAC00E77939 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C57BC9CC2D9DD7B800D817AD /* PipeConstants.swift in Sources */,
+				C50BB2632DAAED500094A152 /* MCPResponse.swift in Sources */,
+				C50BB2642DAAED500094A152 /* MCPRequest.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -228,6 +317,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C50BB2652DAAED500094A152 /* MCPResponse.swift in Sources */,
+				C50BB2662DAAED500094A152 /* MCPRequest.swift in Sources */,
+				C57BC9CD2D9DD7B800D817AD /* PipeConstants.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -244,48 +336,48 @@
 /* Begin XCBuildConfiguration section */
 		C55B13682D87CDAE00E77939 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReferenceAnchor = C55B135D2D87CDAC00E77939 /* MCPExample */;
-			baseConfigurationReferenceRelativePath = "xcconfig/Project-Debug.xcconfig";
+			baseConfigurationReferenceAnchor = C57BC9E02D9E417B00D817AD /* xcconfig */;
+			baseConfigurationReferenceRelativePath = "Project-Debug.xcconfig";
 			buildSettings = {
 			};
 			name = Debug;
 		};
 		C55B13692D87CDAE00E77939 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReferenceAnchor = C55B135D2D87CDAC00E77939 /* MCPExample */;
-			baseConfigurationReferenceRelativePath = "xcconfig/Project-Release.xcconfig";
+			baseConfigurationReferenceAnchor = C57BC9E02D9E417B00D817AD /* xcconfig */;
+			baseConfigurationReferenceRelativePath = "Project-Release.xcconfig";
 			buildSettings = {
 			};
 			name = Release;
 		};
 		C55B136B2D87CDAE00E77939 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReferenceAnchor = C55B135D2D87CDAC00E77939 /* MCPExample */;
-			baseConfigurationReferenceRelativePath = "xcconfig/MCPExample-Debug.xcconfig";
+			baseConfigurationReferenceAnchor = C57BC9E02D9E417B00D817AD /* xcconfig */;
+			baseConfigurationReferenceRelativePath = "MCPExample-Debug.xcconfig";
 			buildSettings = {
 			};
 			name = Debug;
 		};
 		C55B136C2D87CDAE00E77939 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReferenceAnchor = C55B135D2D87CDAC00E77939 /* MCPExample */;
-			baseConfigurationReferenceRelativePath = "xcconfig/MCPExample-Release.xcconfig";
+			baseConfigurationReferenceAnchor = C57BC9E02D9E417B00D817AD /* xcconfig */;
+			baseConfigurationReferenceRelativePath = "MCPExample-Release.xcconfig";
 			buildSettings = {
 			};
 			name = Release;
 		};
 		C55B13A22D87D0F100E77939 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReferenceAnchor = C55B135D2D87CDAC00E77939 /* MCPExample */;
-			baseConfigurationReferenceRelativePath = "xcconfig/mcp-helper-Debug.xcconfig";
+			baseConfigurationReferenceAnchor = C57BC9E02D9E417B00D817AD /* xcconfig */;
+			baseConfigurationReferenceRelativePath = "mcp-helper-Debug.xcconfig";
 			buildSettings = {
 			};
 			name = Debug;
 		};
 		C55B13A32D87D0F100E77939 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReferenceAnchor = C55B135D2D87CDAC00E77939 /* MCPExample */;
-			baseConfigurationReferenceRelativePath = "xcconfig/mcp-helper-Release.xcconfig";
+			baseConfigurationReferenceAnchor = C57BC9E02D9E417B00D817AD /* xcconfig */;
+			baseConfigurationReferenceRelativePath = "mcp-helper-Release.xcconfig";
 			buildSettings = {
 			};
 			name = Release;
@@ -323,7 +415,7 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		C55B136D2D87CE7600E77939 /* XCLocalSwiftPackageReference "../../mcp-template" */ = {
+		C50BB13A2DA9F24E0094A152 /* XCLocalSwiftPackageReference "../../mcp-template" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = "../../mcp-template";
 		};
@@ -341,15 +433,23 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		C50BB13B2DA9F24E0094A152 /* EasyMCP */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = EasyMCP;
+		};
+		C50BB13D2DA9F24E0094A152 /* EasyMacMCP */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = EasyMacMCP;
+		};
+		C50BB18D2DA9F3870094A152 /* EasyMacMCP */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C50BB13A2DA9F24E0094A152 /* XCLocalSwiftPackageReference "../../mcp-template" */;
+			productName = EasyMacMCP;
+		};
 		C5F326F82D87DC25000D77C6 /* ArgumentParser */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = C5F326F72D87DC25000D77C6 /* XCRemoteSwiftPackageReference "swift-argument-parser" */;
 			productName = ArgumentParser;
-		};
-		C5F326FB2D87DC41000D77C6 /* EasyMCP */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = C55B136D2D87CE7600E77939 /* XCLocalSwiftPackageReference "../../mcp-template" */;
-			productName = EasyMCP;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

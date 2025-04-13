@@ -42,6 +42,8 @@ public final class EasyMCP: @unchecked Sendable {
             name: "EasyMCP",
             version: "0.1.0",
             capabilities: MCP.Server.Capabilities(
+                prompts: .init(listChanged: false),
+                resources: .init(subscribe: false, listChanged: false),
                 tools: .init(listChanged: true)
             )
         )
@@ -84,7 +86,6 @@ public final class EasyMCP: @unchecked Sendable {
         try await serverTask?.value
         await server?.waitUntilCompleted()
     }
-
 
     /// Stop the MCP server
     public func stop() async {
@@ -148,5 +149,14 @@ public final class EasyMCP: @unchecked Sendable {
 
             return try await toolMeta.handler(params.arguments ?? [:])
         }
+
+        await server.withMethodHandler(MCP.ListPrompts.self) { _ in
+            return ListPrompts.Result(prompts: [])
+        }
+
+        await server.withMethodHandler(MCP.ListResources.self) { _ in
+            return ListResources.Result(resources: [])
+        }
+
     }
 }
