@@ -17,7 +17,6 @@ struct MCPHelper: AsyncParsableCommand {
     )
 }
 
-@available(macOS 14.0, *)
 struct RunCommand: AsyncParsableCommand, Decodable {
     static let configuration = CommandConfiguration(
         commandName: "run",

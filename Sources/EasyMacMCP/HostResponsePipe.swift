@@ -6,17 +6,16 @@
 //
 
 import Foundation
-import EasyMacMCP
 import Logging
 
 /// Actor that wraps a WritePipe for sending responses from the Mac app to a specific MCP helper
-actor HostResponsePipe {
-    enum Error: Swift.Error {
+public actor HostResponsePipe<Response: MCPResponseProtocol> {
+    public enum Error: Swift.Error {
         case encodeError(_ error: Swift.Error)
         case sendError(_ error: Swift.Error)
     }
 
-    let helperId: String
+    public let helperId: String
     private let writePipe: WritePipe
     private let logger: Logger?
 
@@ -24,27 +23,25 @@ actor HostResponsePipe {
     /// - Parameters:
     ///   - helperId: The unique identifier for the MCP helper
     ///   - logger: Optional logger for debugging
-    init(helperId: String, logger: Logger? = nil) throws {
+    public init(helperId: String, writePipe: WritePipe, logger: Logger? = nil) throws {
         self.helperId = helperId
         self.logger = logger
-
-        let url = PipeConstants.helperResponsePipePath(helperId: helperId)
-        self.writePipe = try WritePipe(url: url)
+        self.writePipe = writePipe
     }
 
     /// Open the pipe for writing
-    func open() async throws {
+    public func open() async throws {
         try await writePipe.open()
     }
 
     /// Close the pipe
-    func close() async {
+    public func close() async {
         await writePipe.close()
     }
 
     /// Send a response to the helper
     /// - Parameter response: The MCPResponse to send
-    func sendResponse(_ response: MCPResponse) async throws {
+    public func sendResponse(_ response: Response) async throws {
         logger?.info("HOST_RESPONSE_PIPE: Sending response to helper \(helperId) with messageId: \(response.messageId)")
 
         let encoder = JSONEncoder()

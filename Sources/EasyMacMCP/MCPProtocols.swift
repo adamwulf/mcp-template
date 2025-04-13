@@ -12,6 +12,12 @@ public protocol MCPRequestProtocol: Codable, Sendable, CaseIterable {
     /// Returns the tool metadata for this specific request case
     var toolMetadata: ToolMetadata? { get }
 
+    /// `true` if the request represents the initialize message from a helper, `false` otherwise
+    var isInitialize: Bool { get }
+
+    /// `true` if the request represents the deinitialize message from a helper, `false` otherwise
+    var isDeinitialize: Bool { get }
+
     /// Initialize a request from MCP call parameters
     /// - Parameters:
     ///   - helperId: The helper ID for the request

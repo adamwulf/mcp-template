@@ -41,6 +41,16 @@ public enum MCPRequest: MCPRequestProtocol {
         }
     }
 
+    public var isInitialize: Bool {
+        guard case .initialize = self else { return false }
+        return true
+    }
+
+    public var isDeinitialize: Bool {
+        guard case .deinitialize = self else { return false }
+        return true
+    }
+
     /// Returns tool metadata for this request case
     public var toolMetadata: ToolMetadata? {
         switch self {
