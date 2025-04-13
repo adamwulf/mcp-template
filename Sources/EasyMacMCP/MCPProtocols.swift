@@ -2,21 +2,21 @@ import Foundation
 import MCP
 
 /// Protocol defining requirements for MCP request types
-public protocol MCPRequestProtocol: Codable, Sendable, CaseIterable {
+public protocol MCPRequestProtocol: Codable, Sendable {
     /// Returns the helper ID associated with this request
     var helperId: String { get }
 
     /// Returns the message ID for this request if applicable
     var messageId: String { get }
 
-    /// Returns the tool metadata for this specific request case
-    var toolMetadata: ToolMetadata? { get }
-
     /// `true` if the request represents the initialize message from a helper, `false` otherwise
     var isInitialize: Bool { get }
 
     /// `true` if the request represents the deinitialize message from a helper, `false` otherwise
     var isDeinitialize: Bool { get }
+
+    /// Returns the list of defined tool metadata that the request type supports
+    static var toolMetadata: [ToolMetadata] { get }
 
     /// Initialize a request from MCP call parameters
     /// - Parameters:

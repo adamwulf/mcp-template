@@ -140,17 +140,8 @@ public final class EasyMCPHelper<Request: MCPRequestProtocol, Response: MCPRespo
         // Clear any existing tools
         tools.removeAll()
 
-        // Collect valid tools from Request.allCases
-        let validTools = Request.allCases.compactMap { requestCase -> (String, ToolMetadata)? in
-            guard let metadata = requestCase.toolMetadata else { return nil }
-            return (metadata.name, metadata)
-        }
-
-        // Create tool registrations (using a dictionary to ensure uniqueness by name)
-        let toolDict = Dictionary(validTools) { first, _ in first }
-
         // Create all the tool registrations
-        for (toolName, metadata) in toolDict {
+        for metadata in Request.toolMetadata {
             let schema: Value = metadata.inputSchema ?? ["type": "object", "properties": [:]]
 
             let tool = Tool(
@@ -160,7 +151,7 @@ public final class EasyMCPHelper<Request: MCPRequestProtocol, Response: MCPRespo
             )
 
             // Store the tool registration
-            tools[toolName] = ToolRegistration(tool: tool, name: toolName)
+            tools[metadata.name] = ToolRegistration(tool: tool, name: metadata.name)
         }
 
         // Notify clients if tools were registered and the server is running

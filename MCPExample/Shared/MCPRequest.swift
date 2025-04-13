@@ -4,14 +4,17 @@ import MCP
 
 /// Represents tool requests sent from the helper to the main app
 public enum MCPRequest: MCPRequestProtocol {
+
     case initialize(helperId: String)
     case deinitialize(helperId: String)
 
     /// A tool with no parameters that returns a greeting
     case helloWorld(helperId: String, messageId: String)
+    static let HelloWorld = "mcp_mcpexample_helloWorld"
 
     /// A tool that accepts a name and returns a personalized greeting
     case helloPerson(helperId: String, messageId: String, name: String)
+    static let HelloPerson = "mcp_mcpexample_helloPerson"
 
     /// Returns the helperId for this tool request
     public var helperId: String {
@@ -52,15 +55,10 @@ public enum MCPRequest: MCPRequestProtocol {
     }
 
     /// Returns tool metadata for this request case
-    public var toolMetadata: ToolMetadata? {
-        switch self {
-        case .initialize, .deinitialize:
-            // These are internal commands, not exposed as tools
-            return nil
-
-        case .helloWorld:
-            return ToolMetadata(
-                name: "mcp_mcpexample_helloWorld",
+    public static var toolMetadata: [ToolMetadata] {
+        return [
+            ToolMetadata(
+                name: Self.HelloWorld,
                 description: "Returns a friendly greeting message",
                 inputSchema: [
                     "type": "object",
@@ -72,11 +70,9 @@ public enum MCPRequest: MCPRequestProtocol {
                     ],
                     "required": ["random_string"]
                 ]
-            )
-
-        case .helloPerson:
-            return ToolMetadata(
-                name: "mcp_mcpexample_helloPerson",
+            ),
+            ToolMetadata(
+                name: Self.HelloPerson,
                 description: "Returns a friendly greeting message",
                 inputSchema: [
                     "type": "object",
@@ -88,16 +84,6 @@ public enum MCPRequest: MCPRequestProtocol {
                     ]
                 ]
             )
-        }
-    }
-
-    /// List of all available cases for CaseIterable conformance
-    public static var allCases: [MCPRequest] {
-        return [
-            .initialize(helperId: "placeholder"),
-            .deinitialize(helperId: "placeholder"),
-            .helloWorld(helperId: "placeholder", messageId: "placeholder"),
-            .helloPerson(helperId: "placeholder", messageId: "placeholder", name: "placeholder")
         ]
     }
 
@@ -110,10 +96,10 @@ public enum MCPRequest: MCPRequestProtocol {
     /// - Throws: Error if the parameters are invalid or can't be converted
     public static func create(helperId: String, messageId: String, parameters: MCP.CallTool.Parameters) throws -> MCPRequest {
         switch parameters.name {
-        case "mcp_mcpexample_helloWorld":
+        case Self.HelloWorld:
             return .helloWorld(helperId: helperId, messageId: messageId)
 
-        case "mcp_mcpexample_helloPerson":
+        case Self.HelloPerson:
             let name = parameters.arguments?["name"]?.stringValue ?? "Anonymous"
             return .helloPerson(helperId: helperId, messageId: messageId, name: name)
 
