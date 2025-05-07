@@ -70,7 +70,9 @@ public actor HelperResponsePipe {
     /// - Returns: The response as a String
     public func readLine() async throws -> String? {
         let line = try await readPipe.readLine()
-        logger?.info("HELPER_RESPONSE_PIPE: Read line from pipe: \(line ?? "nil")")
+        if let line = line {
+            logger?.info("HELPER_RESPONSE_PIPE: Read line from pipe: \(line)")
+        }
         return line
     }
 
