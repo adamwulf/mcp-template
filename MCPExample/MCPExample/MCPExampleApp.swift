@@ -21,7 +21,14 @@ struct MCPExampleApp: App {
             let url = PipeConstants.helperResponsePipePath(helperId: helperId)
             return try WritePipe(url: url)
         }, logger: logger)
-        mcpApp.startListening()
+
+        Task {
+            do {
+                mcpApp.startListening()
+            } catch {
+                print("Error setting up request pipe: \(error)")
+            }
+        }
     }
 
     var body: some Scene {
