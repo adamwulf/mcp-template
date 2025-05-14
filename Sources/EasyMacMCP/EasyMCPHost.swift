@@ -155,6 +155,11 @@ open class EasyMCPHost<Request: MCPRequestProtocol, Response: MCPResponseProtoco
 
         // Also cancel any cleanup task
         cancelCleanupTask(for: helperId)
+
+        // Delete the physical pipe file if we know where it is
+        if let directory = pipesDirectory {
+            await deletePipeFile(for: helperId, in: directory)
+        }
     }
 
     /// Starts a cleanup task for a helper that will close and delete the pipe if no requests are received within the timeout
@@ -167,6 +172,8 @@ open class EasyMCPHost<Request: MCPRequestProtocol, Response: MCPResponseProtoco
             do {
                 // Wait for the timeout period
                 try await Task.sleep(nanoseconds: UInt64(inactivityTimeout * 1_000_000_000))
+
+                guard !Task.isCancelled else { return }
 
                 // If we get here, the timeout expired without activity
                 logger?.info("Helper \(helperId) timed out after \(inactivityTimeout) seconds of inactivity")
@@ -197,14 +204,6 @@ open class EasyMCPHost<Request: MCPRequestProtocol, Response: MCPResponseProtoco
         if let task = cleanupTasks[helperId] {
             task.cancel()
             cleanupTasks.removeValue(forKey: helperId)
-
-            // Start a new cleanup task
-            startCleanupTask(for: helperId)
-        } else {
-            // Only start a new task if we have a pipe for this helper
-            if responsePipes[helperId] != nil {
-                startCleanupTask(for: helperId)
-            }
         }
     }
 
