@@ -129,6 +129,8 @@ public actor ReadPipe: PipeReadable {
                 return line
             }
             // If we get here, the sequence was empty (EOF or no data in non-blocking mode)
+            // Sleep for a short time to avoid spinning CPU when repeatedly called
+            try await Task.sleep(for: .milliseconds(100))
             return nil
         } catch {
             // In non-blocking mode, check for specific errors like EAGAIN/EWOULDBLOCK            
