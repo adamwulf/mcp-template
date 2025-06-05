@@ -28,21 +28,3 @@ public protocol PipeWritable: Sendable {
     /// Closes the pipe
     func close() async
 }
-
-/// Protocol for objects that can read MCP requests from a pipe
-public protocol MCPRequestPipeReadable<Request>: Sendable {
-    associatedtype Request: MCPRequestProtocol
-
-    /// Open the pipe for reading
-    func open() async throws
-
-    /// Close the pipe
-    func close() async
-
-    /// Start continuously reading requests from the pipe
-    /// - Parameter requestHandler: Callback for handling received requests
-    func startReading(requestHandler: @Sendable @escaping (Request) async -> Void) async
-
-    /// Stop reading requests
-    func stopReading() async
-}
