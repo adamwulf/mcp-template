@@ -9,7 +9,7 @@ import Foundation
 import Logging
 
 /// Actor that wraps a WritePipe for sending responses from the Mac app to a specific MCP helper
-public actor HostResponsePipe<Response: MCPResponseProtocol> {
+public actor HostResponsePipe<Response: MCPResponseProtocol>: MCPResponsePipeWritable {
     public enum Error: Swift.Error {
         case encodeError(_ error: Swift.Error)
         case sendError(_ error: Swift.Error)

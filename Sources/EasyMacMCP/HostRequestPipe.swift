@@ -9,7 +9,7 @@ import Foundation
 import Logging
 
 /// Actor that wraps a ReadPipe for receiving requests from MCP helpers
-public actor HostRequestPipe<Request: MCPRequestProtocol> {
+public actor HostRequestPipe<Request: MCPRequestProtocol>: MCPRequestPipeReadable {
     enum Error: Swift.Error {
         case decodeError(_ error: Swift.Error)
         case readError(_ error: Swift.Error)
@@ -22,27 +22,27 @@ public actor HostRequestPipe<Request: MCPRequestProtocol> {
 
     /// Initialize with the central request pipe URL
     /// - Parameters:
-    ///   - url: URL to the central request pipe
+    ///   - readPipe: The pipe to read from
     ///   - logger: Optional logger for debugging
-    init(readPipe: ReadPipe, logger: Logger? = nil) {
+    public init(readPipe: ReadPipe, logger: Logger? = nil) {
         self.readPipe = readPipe
         self.logger = logger
     }
 
     /// Open the pipe for reading
-    func open() async throws {
+    public func open() async throws {
         try await readPipe.open()
     }
 
     /// Close the pipe
-    func close() async {
-        stopReading()
+    public func close() async {
+        await stopReading()
         await readPipe.close()
     }
 
     /// Start continuously reading requests from the pipe
     /// - Parameter requestHandler: Callback for handling received requests
-    func startReading(requestHandler: @Sendable @escaping (Request) async -> Void) async {
+    public func startReading(requestHandler: @Sendable @escaping (Request) async -> Void) async {
         guard !isReading else { return }
         isReading = true
 
@@ -63,7 +63,7 @@ public actor HostRequestPipe<Request: MCPRequestProtocol> {
     }
 
     /// Stop reading requests
-    func stopReading() {
+    public func stopReading() async {
         isReading = false
         readingTask?.cancel()
         readingTask = nil
