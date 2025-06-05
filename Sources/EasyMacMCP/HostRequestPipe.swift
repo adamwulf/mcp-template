@@ -15,16 +15,16 @@ public actor HostRequestPipe<Request: MCPRequestProtocol> {
         case readError(_ error: Swift.Error)
     }
 
-    private let readPipe: ReadPipe
+    private let readPipe: any PipeReadable
     private let logger: Logger?
     private var readingTask: Task<Void, Never>?
     private var isReading = false
 
-    /// Initialize with the central request pipe URL
+    /// Initialize with any readable pipe
     /// - Parameters:
-    ///   - url: URL to the central request pipe
+    ///   - readPipe: Any pipe that conforms to PipeReadable
     ///   - logger: Optional logger for debugging
-    init(readPipe: ReadPipe, logger: Logger? = nil) {
+    init(readPipe: any PipeReadable, logger: Logger? = nil) {
         self.readPipe = readPipe
         self.logger = logger
     }

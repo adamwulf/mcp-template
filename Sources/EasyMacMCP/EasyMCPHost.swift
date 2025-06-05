@@ -15,9 +15,9 @@ open class EasyMCPHost<Request: MCPRequestProtocol, Response: MCPResponseProtoco
     private var requestPipe: HostRequestPipe<Request>
     private var requestReadTask: Task<Void, Never>?
     public let logger: Logger?
-    private var helperWritePipe: (String) throws -> WritePipe
+    private var helperWritePipe: (String) throws -> any PipeWritable
 
-    public init(readPipe: ReadPipe, helperWritePipe: @escaping (String) throws -> WritePipe, logger: Logger?) {
+    public init(readPipe: any PipeReadable, helperWritePipe: @escaping (String) throws -> any PipeWritable, logger: Logger?) {
         self.requestPipe = HostRequestPipe<Request>(readPipe: readPipe, logger: logger)
         self.helperWritePipe = helperWritePipe
         self.logger = logger
@@ -84,7 +84,7 @@ open class EasyMCPHost<Request: MCPRequestProtocol, Response: MCPResponseProtoco
 
                 // Create the response pipe for this specific helper
                 let pipe = try helperWritePipe(helperId)
-                let responsePipe = try HostResponsePipe<Response>(helperId: helperId, writePipe: pipe, logger: logger)
+                let responsePipe = HostResponsePipe<Response>(helperId: helperId, writePipe: pipe, logger: logger)
 
                 // Open the pipe
                 try await responsePipe.open()
