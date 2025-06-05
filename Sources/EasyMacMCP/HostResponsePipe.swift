@@ -8,22 +8,23 @@
 import Foundation
 import Logging
 
-/// Actor that wraps a WritePipe for sending responses from the Mac app to a specific MCP helper
-public actor HostResponsePipe<Response: MCPResponseProtocol>: MCPResponsePipeWritable {
+/// Actor that wraps any PipeWritable for sending responses from the Mac app to a specific MCP helper
+public actor HostResponsePipe<Response: MCPResponseProtocol> {
     public enum Error: Swift.Error {
         case encodeError(_ error: Swift.Error)
         case sendError(_ error: Swift.Error)
     }
 
     public let helperId: String
-    private let writePipe: WritePipe
+    private let writePipe: any PipeWritable
     private let logger: Logger?
 
-    /// Initialize with the helper ID and response pipe URL
+    /// Initialize with the helper ID and any writable pipe
     /// - Parameters:
     ///   - helperId: The unique identifier for the MCP helper
+    ///   - writePipe: Any pipe that conforms to PipeWritable
     ///   - logger: Optional logger for debugging
-    public init(helperId: String, writePipe: WritePipe, logger: Logger? = nil) throws {
+    public init(helperId: String, writePipe: any PipeWritable, logger: Logger? = nil) {
         self.helperId = helperId
         self.logger = logger
         self.writePipe = writePipe

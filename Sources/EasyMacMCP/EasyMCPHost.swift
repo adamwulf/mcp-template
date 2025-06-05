@@ -11,19 +11,15 @@ import Logging
 @MainActor
 open class EasyMCPHost<Request: MCPRequestProtocol, Response: MCPResponseProtocol>: Sendable {
     // Maps helper IDs to their respective response pipes
-    private var responsePipes: [String: any MCPResponsePipeWritable<Response>] = [:]
-    private var requestPipe: any MCPRequestPipeReadable<Request>
+    private var responsePipes: [String: HostResponsePipe<Response>] = [:]
+    private var requestPipe: HostRequestPipe<Request>
     private var requestReadTask: Task<Void, Never>?
     public let logger: Logger?
-    private var helperResponsePipeFactory: (String) async throws -> any MCPResponsePipeWritable<Response>
+    private var helperWritePipe: (String) throws -> any PipeWritable
 
-    public init(
-        requestPipe: any MCPRequestPipeReadable<Request>,
-        helperResponsePipeFactory: @escaping (String) async throws -> any MCPResponsePipeWritable<Response>,
-        logger: Logger?
-    ) {
-        self.requestPipe = requestPipe
-        self.helperResponsePipeFactory = helperResponsePipeFactory
+    public init(readPipe: ReadPipe, helperWritePipe: @escaping (String) throws -> any PipeWritable, logger: Logger?) {
+        self.requestPipe = HostRequestPipe<Request>(readPipe: readPipe, logger: logger)
+        self.helperWritePipe = helperWritePipe
         self.logger = logger
     }
 
@@ -74,7 +70,7 @@ open class EasyMCPHost<Request: MCPRequestProtocol, Response: MCPResponseProtoco
         responsePipes.removeAll()
     }
 
-    public func responsePipe(for helperId: String) -> (any MCPResponsePipeWritable<Response>)? {
+    public func responsePipe(for helperId: String) -> HostResponsePipe<Response>? {
         return responsePipes[helperId]
     }
 
@@ -86,8 +82,9 @@ open class EasyMCPHost<Request: MCPRequestProtocol, Response: MCPResponseProtoco
             do {
                 print("Setting up response pipe for helper \(helperId)")
 
-                // Create the response pipe for this specific helper using the factory
-                let responsePipe = try await helperResponsePipeFactory(helperId)
+                // Create the response pipe for this specific helper
+                let pipe = try helperWritePipe(helperId)
+                let responsePipe = HostResponsePipe<Response>(helperId: helperId, writePipe: pipe, logger: logger)
 
                 // Open the pipe
                 try await responsePipe.open()
@@ -111,28 +108,5 @@ open class EasyMCPHost<Request: MCPRequestProtocol, Response: MCPResponseProtoco
         print("Closing response pipe for helper \(helperId)")
         await pipe.close()
         responsePipes.removeValue(forKey: helperId)
-    }
-
-    /// Convenience initializer for the standard case using concrete ReadPipe and WritePipe implementations
-    /// - Parameters:
-    ///   - readPipe: The ReadPipe to read requests from
-    ///   - helperWritePipe: Factory function to create WritePipe instances for each helper
-    ///   - logger: Optional logger for debugging
-    public convenience init(
-        readPipe: ReadPipe,
-        helperWritePipe: @escaping (String) throws -> WritePipe,
-        logger: Logger?
-    ) {
-        let requestPipe = HostRequestPipe<Request>(readPipe: readPipe, logger: logger)
-        let responseFactory: (String) async throws -> any MCPResponsePipeWritable<Response> = { helperId in
-            let writePipe = try helperWritePipe(helperId)
-            return try HostResponsePipe<Response>(helperId: helperId, writePipe: writePipe, logger: logger)
-        }
-
-        self.init(
-            requestPipe: requestPipe,
-            helperResponsePipeFactory: responseFactory,
-            logger: logger
-        )
     }
 }

@@ -46,21 +46,3 @@ public protocol MCPRequestPipeReadable<Request>: Sendable {
     /// Stop reading requests
     func stopReading() async
 }
-
-/// Protocol for objects that can write MCP responses to a pipe
-public protocol MCPResponsePipeWritable<Response>: Sendable {
-    associatedtype Response: MCPResponseProtocol
-
-    /// The unique identifier for the MCP helper
-    var helperId: String { get }
-
-    /// Open the pipe for writing
-    func open() async throws
-
-    /// Close the pipe
-    func close() async
-
-    /// Send a response to the helper
-    /// - Parameter response: The MCPResponse to send
-    func sendResponse(_ response: Response) async throws
-}
