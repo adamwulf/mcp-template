@@ -17,7 +17,7 @@ open class EasyMCPHost<Request: MCPRequestProtocol, Response: MCPResponseProtoco
     public let logger: Logger?
     private var helperWritePipe: (String) throws -> any PipeWritable
 
-    public init(readPipe: ReadPipe, helperWritePipe: @escaping (String) throws -> any PipeWritable, logger: Logger?) {
+    public init(readPipe: any PipeReadable, helperWritePipe: @escaping (String) throws -> any PipeWritable, logger: Logger?) {
         self.requestPipe = HostRequestPipe<Request>(readPipe: readPipe, logger: logger)
         self.helperWritePipe = helperWritePipe
         self.logger = logger
