@@ -15,9 +15,6 @@ public protocol MCPRequestProtocol: Codable, Sendable {
     /// `true` if the request represents the deinitialize message from a helper, `false` otherwise
     var isDeinitialize: Bool { get }
 
-    /// Returns the list of defined tool metadata that the request type supports
-    static var toolMetadata: [ToolMetadata] { get }
-
     /// Initialize a request from MCP call parameters
     /// - Parameters:
     ///   - helperId: The helper ID for the request
@@ -29,7 +26,7 @@ public protocol MCPRequestProtocol: Codable, Sendable {
 }
 
 /// Metadata for MCP tools
-public struct ToolMetadata: Sendable {
+public struct ToolMetadata: Sendable, Codable {
     /// The name of the tool
     public let name: String
 

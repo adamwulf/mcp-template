@@ -15,11 +15,6 @@ public final class EasyMCPHelper<Request: MCPRequestProtocol, Response: MCPRespo
         case invalidCase
     }
 
-    private struct ToolRegistration {
-        let tool: MCP.Tool
-        let name: String
-    }
-
     // Internal MCP instance
     private var server: MCP.Server?
     // Transport instance
@@ -36,8 +31,6 @@ public final class EasyMCPHelper<Request: MCPRequestProtocol, Response: MCPRespo
     private let requestPipe: HelperRequestPipe
     // Response manager for matching requests and responses
     private let responseManager: ResponseManager<Response>
-    // Tools with handlers
-    private var tools: [String: ToolRegistration] = [:]
 
     /// Initializes a new EasyMacMCP instance
     /// - Parameters:
@@ -85,8 +78,7 @@ public final class EasyMCPHelper<Request: MCPRequestProtocol, Response: MCPRespo
         let stdioTransport = MCP.StdioTransport(logger: logger)
         self.transport = stdioTransport
 
-        // Register tools automatically based on Request.allCases
-        try await registerToolsFromCases()
+        // No longer register tools automatically - ListTools will be passthrough
 
         // Register standard MCP handlers
         await registerTools()
@@ -135,29 +127,11 @@ public final class EasyMCPHelper<Request: MCPRequestProtocol, Response: MCPRespo
 
     // MARK: - Tools
 
-    /// Collect available tools from Request.allCases
-    private func registerToolsFromCases() async throws {
-        // Clear any existing tools
-        tools.removeAll()
-
-        // Create all the tool registrations
-        for metadata in Request.toolMetadata {
-            let schema: Value = metadata.inputSchema ?? ["type": "object", "properties": [:]]
-
-            let tool = Tool(
-                name: metadata.name,
-                description: metadata.description,
-                inputSchema: schema
-            )
-
-            // Store the tool registration
-            tools[metadata.name] = ToolRegistration(tool: tool, name: metadata.name)
-        }
-
-        // Notify clients if tools were registered and the server is running
-        if !tools.isEmpty && isRunning {
-            try await server?.notify(ToolListChangedNotification.message())
-        }
+    /// Get fallback tools list in case passthrough fails
+    private func getFallbackToolsList() -> MCP.ListTools.Result {
+        // Return empty list as fallback since tools are now managed by Mac app
+        self.logger?.warning("HELPER: Using fallback empty tools list")
+        return MCP.ListTools.Result(tools: [])
     }
 
     // MARK: - Private
@@ -166,15 +140,39 @@ public final class EasyMCPHelper<Request: MCPRequestProtocol, Response: MCPRespo
     private func registerTools() async {
         guard let server = server else { return }
 
-        // Register the tools/list handler
+        // Register the tools/list handler as passthrough
         await server.withMethodHandler(MCP.ListTools.self) { [weak self] _ in
             guard let self = self else {
                 return MCP.ListTools.Result(tools: [])
             }
 
-            // Return our registered tools
-            let allTools = Array(self.tools.values.map { $0.tool })
-            return MCP.ListTools.Result(tools: allTools)
+            // Send ListToolsRequest to Mac app and wait for response
+            do {
+                let messageId = UUID().uuidString
+                let listRequest = ListToolsRequest(helperId: self.helperId, messageId: messageId)
+
+                self.logger?.info("HELPER: Sending ListTools request with messageId: \(messageId)")
+                try await self.requestPipe.sendRequest(listRequest)
+
+                // Wait for response with timeout
+                let response = try await self.responseManager.waitForResponse(
+                    helperId: self.helperId,
+                    messageId: messageId,
+                    timeout: 10.0)
+
+                // Try to cast to ListToolsResponse
+                if let listResponse = response as? ListToolsResponse {
+                    self.logger?.info("HELPER: Received ListTools response with \(listResponse.tools.count) tools")
+                    return listResponse.asMCPToolsList()
+                } else {
+                    self.logger?.warning("HELPER: Received unexpected response type for ListTools")
+                    return self.getFallbackToolsList()
+                }
+
+            } catch {
+                self.logger?.error("HELPER: Error in ListTools passthrough: \(error.localizedDescription)")
+                return self.getFallbackToolsList()
+            }
         }
 
         // Register a single CallTool handler for all tools
@@ -186,13 +184,7 @@ public final class EasyMCPHelper<Request: MCPRequestProtocol, Response: MCPRespo
                 )
             }
 
-            // Check if we have this tool registered
-            guard self.tools[params.name] != nil else {
-                return MCP.CallTool.Result(
-                    content: [.text("Tool not found: \(params.name)")],
-                    isError: true
-                )
-            }
+            // All tools are now handled by passthrough - no local validation needed
 
             do {
                 // Generate a message ID for this request
