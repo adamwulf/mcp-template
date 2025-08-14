@@ -15,9 +15,6 @@ public protocol MCPRequestProtocol: Codable, Sendable {
     /// `true` if the request represents the deinitialize message from a helper, `false` otherwise
     var isDeinitialize: Bool { get }
 
-    /// Returns the list of defined tool metadata that the request type supports
-    static var toolMetadata: [ToolMetadata] { get }
-
     /// Initialize a request from MCP call parameters
     /// - Parameters:
     ///   - helperId: The helper ID for the request
@@ -26,10 +23,17 @@ public protocol MCPRequestProtocol: Codable, Sendable {
     /// - Returns: An initialized request
     /// - Throws: Error if the parameters are invalid or can't be converted
     static func create(helperId: String, messageId: String, parameters: MCP.CallTool.Parameters) throws -> Self
+
+    /// Create a ListTools request for requesting available tools
+    /// - Parameters:
+    ///   - helperId: The helper ID for the request
+    ///   - messageId: A unique message ID for this request
+    /// - Returns: A request instance for listing tools
+    static func makeListToolsRequest(helperId: String, messageId: String) -> Self
 }
 
 /// Metadata for MCP tools
-public struct ToolMetadata: Sendable {
+public struct ToolMetadata: Sendable, Codable {
     /// The name of the tool
     public let name: String
 
@@ -61,5 +65,17 @@ public protocol MCPResponseProtocol: Codable, Sendable {
 
     /// Convert this response to an MCP.CallTool.Result
     /// - Returns: A properly formatted result for the MCP tool call
-    func asResult() -> MCP.CallTool.Result
+    func asCallToolResult() -> MCP.CallTool.Result
+
+    /// Create a ListTools response containing available tools
+    /// - Parameters:
+    ///   - helperId: The helper ID for the response
+    ///   - messageId: The message ID matching the request
+    ///   - tools: Array of available tool metadata
+    /// - Returns: A response instance containing the tools
+    static func makeListToolsResponse(helperId: String, messageId: String, tools: [ToolMetadata]) -> Self
+
+    /// Convert this response to MCP.ListTools.Result format
+    /// - Returns: A properly formatted MCP ListTools result, or nil if not a ListTools response
+    func asListToolsResult() -> MCP.ListTools.Result?
 }
