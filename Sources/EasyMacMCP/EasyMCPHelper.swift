@@ -146,10 +146,10 @@ public final class EasyMCPHelper<Request: MCPRequestProtocol, Response: MCPRespo
                 return MCP.ListTools.Result(tools: [])
             }
 
-            // Send ListToolsRequest to Mac app and wait for response
+            // Send ListTools request to Mac app and wait for response
             do {
                 let messageId = UUID().uuidString
-                let listRequest = ListToolsRequest(helperId: self.helperId, messageId: messageId)
+                let listRequest = Request.makeListToolsRequest(helperId: self.helperId, messageId: messageId)
 
                 self.logger?.info("HELPER: Sending ListTools request with messageId: \(messageId)")
                 try await self.requestPipe.sendRequest(listRequest)
@@ -160,10 +160,10 @@ public final class EasyMCPHelper<Request: MCPRequestProtocol, Response: MCPRespo
                     messageId: messageId,
                     timeout: 10.0)
 
-                // Try to cast to ListToolsResponse
-                if let listResponse = response as? ListToolsResponse {
-                    self.logger?.info("HELPER: Received ListTools response with \(listResponse.tools.count) tools")
-                    return listResponse.asMCPToolsList()
+                // Try to convert to MCP.ListTools.Result
+                if let mcpResult = response.asListToolsResult() {
+                    self.logger?.info("HELPER: Received ListTools response with \(mcpResult.tools.count) tools")
+                    return mcpResult
                 } else {
                     self.logger?.warning("HELPER: Received unexpected response type for ListTools")
                     return self.getFallbackToolsList()
@@ -220,7 +220,7 @@ public final class EasyMCPHelper<Request: MCPRequestProtocol, Response: MCPRespo
                 logger?.info("HELPER: Received response with messageId: \(response.messageId)")
 
                 // Convert the response to the MCP.CallTool.Result format using the response's own method
-                return response.asResult()
+                return response.asCallToolResult()
             } catch {
                 return MCP.CallTool.Result(
                     content: [.text("Error executing tool: \(error)")],
