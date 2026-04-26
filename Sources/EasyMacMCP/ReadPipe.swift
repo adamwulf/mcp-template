@@ -21,6 +21,11 @@ public enum ReadPipeError: Error {
 public actor ReadPipe: PipeReadable {
     private let fileURL: URL
     private var fileHandle: FileHandle?
+    /// Persistent line iterator over `fileHandle.bytes.lines`. Held across
+    /// `readLine()` calls so the underlying `AsyncBytes` chunk buffer
+    /// survives — building a fresh iterator per call would over-read the FD
+    /// and silently discard any extra lines that came in the same chunk.
+    private var lineIterator: AsyncLineSequence<FileHandle.AsyncBytes>.AsyncIterator?
 
     /// Initialize with a URL that represents where the pipe should be created
     /// - Parameters:
@@ -111,29 +116,41 @@ public actor ReadPipe: PipeReadable {
         }
 
         // Create file handle
-        fileHandle = FileHandle(fileDescriptor: fileDescriptor, closeOnDealloc: true)
+        let handle = FileHandle(fileDescriptor: fileDescriptor, closeOnDealloc: true)
+        fileHandle = handle
+        lineIterator = handle.bytes.lines.makeAsyncIterator()
     }
 
-    /// Reads a single line from the pipe
-    /// - Returns: A single line as a string, or nil if the stream ends or no data available in non-blocking mode
-    /// - Throws: ReadPipeError if reading fails
+    /// Reads a single line from the pipe.
+    ///
+    /// Uses a persistent `AsyncLineSequence` iterator so chunked reads from
+    /// the underlying FD don't drop buffered lines between calls. When the
+    /// iterator returns `nil` (all writers detached → EOF), rebuild it once
+    /// from the same FD and retry, so a writer that reattaches later resumes
+    /// the read loop cleanly.
+    /// - Returns: A single line, or `nil` if the pipe is at EOF and no
+    ///   writer reattached.
+    /// - Throws: `ReadPipeError` if reading fails.
     public func readLine() async throws -> String? {
-        guard let fileHandle = fileHandle else {
+        guard let handle = fileHandle, var iterator = lineIterator else {
             Logging.printError("Error: Pipe not opened")
             throw ReadPipeError.pipeNotOpened
         }
 
         do {
-            // In non-blocking mode, this may return immediately if no data is available
-            for try await line in fileHandle.bytes.lines {
+            if let line = try await iterator.next() {
+                lineIterator = iterator
                 return line
             }
-            // If we get here, the sequence was empty (EOF or no data in non-blocking mode)
-            // Sleep for a short time to avoid spinning CPU when repeatedly called
-            try await Task.sleep(for: .milliseconds(100))
-            return nil
+            // EOF on this iterator. Rebuild from the same FD and try once
+            // more — a freshly-attached writer will block the read until it
+            // produces data, matching the original "read forever" contract.
+            var rebuilt = handle.bytes.lines.makeAsyncIterator()
+            let line = try await rebuilt.next()
+            lineIterator = rebuilt
+            return line
         } catch {
-            // In non-blocking mode, check for specific errors like EAGAIN/EWOULDBLOCK            
+            lineIterator = iterator
             Logging.printError("Error reading line from pipe", error: error)
             throw ReadPipeError.readError(error)
         }
@@ -141,6 +158,7 @@ public actor ReadPipe: PipeReadable {
 
     /// Closes the pipe
     public func close() async {
+        lineIterator = nil
         try? fileHandle?.close()
         fileHandle = nil
     }
