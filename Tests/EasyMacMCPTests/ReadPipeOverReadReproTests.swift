@@ -165,6 +165,79 @@ final class ReadPipeOverReadReproTests: XCTestCase {
         await reader.close()
     }
 
+    /// All-external-writers-detach gap: open ReadPipe, attach an external
+    /// WritePipe, write+read a line, close the WritePipe so zero external
+    /// writers remain. Then a separate Task opens a NEW WritePipe after a
+    /// brief delay and writes a second line. The reader's `readLine()` must
+    /// block across the writer-detach gap and return the second line.
+    ///
+    /// Without the self-pipe keepalive, `AsyncBytes` sees the kernel writer
+    /// count drop to zero and ends the sequence with EOF — `readLine()`
+    /// returns nil immediately and `HostRequestPipe.startReading` spins.
+    /// With the keepalive in place, ReadPipe holds its own writer FD so the
+    /// kernel writer count stays positive, `read(2)` blocks, and the second
+    /// line arrives normally.
+    func testReadLineBlocksWhenAllExternalWritersDetach() async throws {
+        let reader = try ReadPipe(url: fifoURL)
+        try await reader.open()
+
+        let writer1 = try WritePipe(url: fifoURL)
+        try await writer1.open()
+        try await writer1.write("first\n")
+
+        let firstLine = try await reader.readLine()
+        XCTAssertEqual(firstLine, "first")
+
+        // Detach the only external writer. Without the keepalive, the next
+        // readLine() would see EOF and return nil immediately.
+        await writer1.close()
+
+        // In a background task, sleep briefly then attach a NEW writer and
+        // send the second line. The reader must be blocked on readLine()
+        // across this gap.
+        let url = fifoURL!
+        let writerTask = Task {
+            try await Task.sleep(for: .milliseconds(50))
+            let writer2 = try WritePipe(url: url)
+            try await writer2.open()
+            try await writer2.write("second\n")
+            return writer2
+        }
+
+        // Bound the read with a deadline so a regression doesn't hang the
+        // test indefinitely. If the keepalive is missing, readLine() returns
+        // nil quickly (well under the deadline) and the assertion fails.
+        let secondLine: String? = await withTaskGroup(of: String?.self) { group in
+            group.addTask {
+                return try? await reader.readLine()
+            }
+            group.addTask {
+                // Use throwing sleep so group.cancelAll() on the happy path
+                // propagates cancellation here and skips the unnecessary
+                // reader.close() (the trailing close at the end of the test
+                // already handles cleanup).
+                do {
+                    try await Task.sleep(for: .seconds(3))
+                } catch {
+                    return nil
+                }
+                // Deadline genuinely fired: close the reader to unblock any
+                // hung readLine() so the test fails fast on regression.
+                await reader.close()
+                return nil
+            }
+            let result = await group.next() ?? nil
+            group.cancelAll()
+            return result
+        }
+
+        XCTAssertEqual(secondLine, "second", "readLine() should have blocked across the writer-detach gap and returned the line from the reattached writer; nil here means the keepalive writer FD is missing or got closed")
+
+        let writer2 = try await writerTask.value
+        await writer2.close()
+        await reader.close()
+    }
+
     // MARK: - Helpers
 
     /// Reads up to `count` lines from `reader`, with a hard wall-clock
