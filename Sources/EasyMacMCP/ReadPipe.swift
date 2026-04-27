@@ -9,9 +9,11 @@ public enum ReadPipeError: Error {
     case pipeDoesNotExist
     case notAPipe
     case openFailed(String)
+    case keepaliveOpenFailed(String)
     case getFlagsFailed(String)
     case setFlagsFailed(String)
     case pipeNotOpened
+    case pipeAlreadyOpen
     case readError(Error)
     case eof
     case stringEncodingError
@@ -88,8 +90,18 @@ public actor ReadPipe: PipeReadable {
     }
 
     /// Opens the pipe for reading without blocking on open, but allowing blocking reads
-    /// - Throws: ReadPipeError if opening fails
+    /// - Throws: ReadPipeError if opening fails, including `.pipeAlreadyOpen`
+    ///   if the pipe is already open and `.keepaliveOpenFailed` if the
+    ///   self-pipe writer FD could not be opened (in which case the reader
+    ///   FD is closed and no resources are leaked).
     public func open() async throws {
+        // Reject double-open. Re-opening would leak the previous reader FD's
+        // FileHandle and the keepalive writer FD; callers must close()
+        // explicitly before re-opening.
+        guard fileHandle == nil && keepaliveWriterFD == nil else {
+            throw ReadPipeError.pipeAlreadyOpen
+        }
+
         // Make sure the path exists and is a pipe
         let pipePath = fileURL.path
         guard FileManager.default.fileExists(atPath: pipePath) else {
@@ -126,23 +138,28 @@ public actor ReadPipe: PipeReadable {
             // We still create the file handle but log the error
         }
 
-        // Create file handle
-        let handle = FileHandle(fileDescriptor: fileDescriptor, closeOnDealloc: true)
-        fileHandle = handle
-        lineIterator = handle.bytes.lines.makeAsyncIterator()
-
         // Open a writer-side FD against the same FIFO and hold it for the
         // lifetime of the ReadPipe. This keeps the kernel writer count above
         // zero so external writers detaching does not trigger EOF on the
         // reader. O_NONBLOCK is required on this open so it cannot block when
         // there is currently no other writer; we never write to this FD.
+        // Failure here means we cannot guarantee the no-EOF contract, so we
+        // close the reader FD and surface an error rather than silently
+        // re-introducing the original CPU-spin bug.
         let keepaliveFD = Darwin.open(pipePath, O_WRONLY | O_NONBLOCK, 0)
-        if keepaliveFD == -1 {
+        guard keepaliveFD != -1 else {
             let errorString = String(cString: strerror(errno))
-            Logging.printError("Warning: failed to open keepalive writer FD on \(pipePath): \(errorString) (errno: \(errno)). ReadPipe will still function but may spin the caller's read loop if all external writers detach.")
-        } else {
-            keepaliveWriterFD = keepaliveFD
+            Logging.printError("Error opening keepalive writer FD: \(errorString) (errno: \(errno))")
+            Darwin.close(fileDescriptor)
+            throw ReadPipeError.keepaliveOpenFailed(errorString)
         }
+
+        // Both FDs are now owned by self. Create the FileHandle (which will
+        // close the reader FD on dealloc) and stash the keepalive.
+        let handle = FileHandle(fileDescriptor: fileDescriptor, closeOnDealloc: true)
+        fileHandle = handle
+        lineIterator = handle.bytes.lines.makeAsyncIterator()
+        keepaliveWriterFD = keepaliveFD
     }
 
     /// Reads a single line from the pipe.

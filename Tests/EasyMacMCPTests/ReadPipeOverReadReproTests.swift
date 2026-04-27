@@ -212,8 +212,17 @@ final class ReadPipeOverReadReproTests: XCTestCase {
                 return try? await reader.readLine()
             }
             group.addTask {
-                try? await Task.sleep(for: .seconds(3))
-                // Deadline: close the reader to unblock any hung readLine().
+                // Use throwing sleep so group.cancelAll() on the happy path
+                // propagates cancellation here and skips the unnecessary
+                // reader.close() (the trailing close at the end of the test
+                // already handles cleanup).
+                do {
+                    try await Task.sleep(for: .seconds(3))
+                } catch {
+                    return nil
+                }
+                // Deadline genuinely fired: close the reader to unblock any
+                // hung readLine() so the test fails fast on regression.
                 await reader.close()
                 return nil
             }
