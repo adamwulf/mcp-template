@@ -179,7 +179,7 @@ public final class EasyMCPHelper<Request: MCPRequestProtocol, Response: MCPRespo
         await server.withMethodHandler(MCP.CallTool.self) { [weak self] params in
             guard let self = self else {
                 return MCP.CallTool.Result(
-                    content: [.text("Service unavailable")],
+                    content: [.text(text: "Service unavailable", annotations: nil, _meta: nil)],
                     isError: true
                 )
             }
@@ -223,7 +223,7 @@ public final class EasyMCPHelper<Request: MCPRequestProtocol, Response: MCPRespo
                 return response.asCallToolResult()
             } catch {
                 return MCP.CallTool.Result(
-                    content: [.text("Error executing tool: \(error)")],
+                    content: [.text(text: "Error executing tool: \(error)", annotations: nil, _meta: nil)],
                     isError: true
                 )
             }
