@@ -46,11 +46,10 @@ struct RunCommand: AsyncParsableCommand {
 
         do {
             // Register a simple tool with no input
-            try await mcp.register(tool: Tool(
+            try await mcp.register(
                 name: "helloWorld",
-                description: "Returns a friendly greeting message",
-                inputSchema: ["type": "object", "properties": [:]]
-            )) { _ in
+                description: "Returns a friendly greeting message"
+            ) { _ in
                 return Result(content: [.text(text: helloworld(), annotations: nil, _meta: nil)], isError: false)
             }
         } catch {
@@ -94,11 +93,10 @@ struct RunCommand: AsyncParsableCommand {
 
             do {
                 // Register a simple tool with no input
-                try await mcp.register(tool: Tool(
+                try await mcp.register(
                     name: "helloEveryone",
-                    description: "Returns a friendly greeting message to everyone around",
-                    inputSchema: ["type": "object", "properties": [:]]
-                )) { _ in
+                    description: "Returns a friendly greeting message to everyone around"
+                ) { _ in
                     return Result(content: [.text(text: helloworld(), annotations: nil, _meta: nil)], isError: false)
                 }
                 logger.info("registered extra tool")

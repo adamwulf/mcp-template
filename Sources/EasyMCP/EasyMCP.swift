@@ -111,6 +111,20 @@ public final class EasyMCP: @unchecked Sendable {
         }
     }
 
+    /// Convenience for registering a tool that takes no arguments. Synthesizes an empty object input schema.
+    public func register(
+        name: String,
+        description: String,
+        handler: @escaping ([String: Value]) async throws -> Result
+    ) async throws {
+        let tool = Tool(
+            name: name,
+            description: description,
+            inputSchema: ["type": "object", "properties": [:]]
+        )
+        try await register(tool: tool, handler: handler)
+    }
+
     // MARK: - Private
 
     /// Register MCP handlers to list and call tools
