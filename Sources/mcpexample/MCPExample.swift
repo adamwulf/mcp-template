@@ -48,9 +48,10 @@ struct RunCommand: AsyncParsableCommand {
             // Register a simple tool with no input
             try await mcp.register(tool: Tool(
                 name: "helloWorld",
-                description: "Returns a friendly greeting message"
+                description: "Returns a friendly greeting message",
+                inputSchema: ["type": "object", "properties": [:]]
             )) { _ in
-                return Result(content: [.text(helloworld())], isError: false)
+                return Result(content: [.text(text: helloworld(), annotations: nil, _meta: nil)], isError: false)
             }
         } catch {
             FileHandle.standardError.write(Data(("error 1: " + String(describing: error)).utf8))
@@ -72,7 +73,7 @@ struct RunCommand: AsyncParsableCommand {
                     ]
                 ]
             )) { input in
-                return Result(content: [.text(hello(input["name"]?.stringValue ?? "world"))], isError: false)
+                return Result(content: [.text(text: hello(input["name"]?.stringValue ?? "world"), annotations: nil, _meta: nil)], isError: false)
             }
         } catch {
             FileHandle.standardError.write(Data(("error 1: " + String(describing: error)).utf8))
@@ -95,9 +96,10 @@ struct RunCommand: AsyncParsableCommand {
                 // Register a simple tool with no input
                 try await mcp.register(tool: Tool(
                     name: "helloEveryone",
-                    description: "Returns a friendly greeting message to everyone around"
+                    description: "Returns a friendly greeting message to everyone around",
+                    inputSchema: ["type": "object", "properties": [:]]
                 )) { _ in
-                    return Result(content: [.text(helloworld())], isError: false)
+                    return Result(content: [.text(text: helloworld(), annotations: nil, _meta: nil)], isError: false)
                 }
                 logger.info("registered extra tool")
             } catch {

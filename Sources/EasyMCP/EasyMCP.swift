@@ -104,13 +104,7 @@ public final class EasyMCP: @unchecked Sendable {
     // Register a tool with the server. The server must already be started to register a tool.
     public func register(tool: Tool, handler: @escaping ([String: Value]) async throws -> Result) async throws {
         guard let server = server else { return }
-        if tool.inputSchema == nil {
-            let inputSchema: Value = ["type": "object", "properties": [:]]
-            let toolWithSchema = Tool(name: tool.name, description: tool.description, inputSchema: inputSchema)
-            tools[tool.name] = ToolMeta(tool: toolWithSchema, handler: handler)
-        } else {
-            tools[tool.name] = ToolMeta(tool: tool, handler: handler)
-        }
+        tools[tool.name] = ToolMeta(tool: tool, handler: handler)
 
         if isRunning {
             try await server.notify(ToolListChangedNotification.message())
@@ -135,14 +129,14 @@ public final class EasyMCP: @unchecked Sendable {
         await server.withMethodHandler(MCP.CallTool.self) { [weak self] params in
             guard let self = self else {
                 return MCP.CallTool.Result(
-                    content: [.text("Service unavailable")],
+                    content: [.text(text: "Service unavailable", annotations: nil, _meta: nil)],
                     isError: true
                 )
             }
 
             guard let toolMeta = tools[params.name] else {
                 return MCP.CallTool.Result(
-                    content: [.text("Tool not found: \(params.name)")],
+                    content: [.text(text: "Tool not found: \(params.name)", annotations: nil, _meta: nil)],
                     isError: true
                 )
             }
