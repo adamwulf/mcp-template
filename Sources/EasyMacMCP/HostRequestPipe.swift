@@ -40,7 +40,12 @@ public actor HostRequestPipe<Request: MCPRequestProtocol> {
         await readPipe.close()
     }
 
-    /// Start continuously reading requests from the pipe
+    /// Start continuously reading requests from the pipe.
+    ///
+    /// Each request is dispatched in its own Task so handlers run concurrently and the
+    /// read loop never blocks. Handler ordering is not guaranteed; MCP matches by
+    /// `messageId`.
+    ///
     /// - Parameter requestHandler: Callback for handling received requests
     func startReading(requestHandler: @Sendable @escaping (Request) async -> Void) async {
         guard !isReading else { return }
@@ -52,7 +57,7 @@ public actor HostRequestPipe<Request: MCPRequestProtocol> {
             do {
                 while isReading && !Task.isCancelled {
                     if let request = try await readRequest() {
-                        await requestHandler(request)
+                        Task { await requestHandler(request) }
                     }
                 }
             } catch {
