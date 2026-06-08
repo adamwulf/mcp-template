@@ -333,6 +333,117 @@ final class ReadPipeOverReadReproTests: XCTestCase {
         await externalWriter.close()
     }
 
+    /// Close with no external writer attached at all.
+    ///
+    /// Realistic scenario: the helper opens its response pipe before the
+    /// host app has wired up its writer (or the host has already detached
+    /// and quit), then the helper shuts down. The only writer on the FIFO
+    /// is ReadPipe's own keepalive FD.
+    ///
+    /// Without an external writer, the sentinel write in close() could
+    /// theoretically SIGPIPE if our keepalive FD were the only writer AND
+    /// it were somehow torn down before the write — this test guards
+    /// against a regression where the keepalive close-order or signal
+    /// disposition gets disturbed. With the current fix, the write goes
+    /// out, the keepalive is the sole reader-of-its-own-write (nobody
+    /// drains), then the FD is closed and torn down cleanly.
+    func testCloseWithNoExternalWriterAttached() async throws {
+        let reader = try ReadPipe(url: fifoURL)
+        try await reader.open()
+
+        // No external writer at all. close() should return promptly.
+        let closeStartedAt = ContinuousClock.now
+        await reader.close()
+        let elapsed = ContinuousClock.now - closeStartedAt
+
+        XCTAssertLessThan(elapsed, .seconds(1), "close() should return in well under a second with no external writer attached")
+    }
+
+    /// Concurrent close() calls from two Tasks.
+    ///
+    /// Realistic scenario: the helper has two shutdown paths that both end
+    /// up calling close() on the same pipe — e.g. an explicit cleanup
+    /// closure in sendRequest() and a defer/finalizer somewhere else. Actor
+    /// reentrancy serializes them, but the second call must not crash
+    /// (double-close on the FD), SIGPIPE, or hang.
+    ///
+    /// Both calls should complete quickly; the second is a no-op since
+    /// keepaliveWriterFD and fileHandle are both nil by then.
+    func testConcurrentCloseCalls() async throws {
+        let reader = try ReadPipe(url: fifoURL)
+        try await reader.open()
+
+        let closeStartedAt = ContinuousClock.now
+        async let close1: Void = reader.close()
+        async let close2: Void = reader.close()
+        _ = await (close1, close2)
+        let elapsed = ContinuousClock.now - closeStartedAt
+
+        XCTAssertLessThan(elapsed, .seconds(1), "two concurrent close() calls should both return promptly; >=1s suggests a hang or busy-loop")
+
+        // A third close() after both have returned should still be a clean
+        // no-op. Catches a regression where state isn't properly nil-ed.
+        await reader.close()
+    }
+
+    /// HelperResponsePipe.close() while a reader Task is mid-readLine().
+    ///
+    /// This is the exact layer ResponseManager uses in production (see
+    /// ResponseManager.swift:56 and :86 from the thread dump). The fix
+    /// lives one level down in ReadPipe.close(), but this test pins down
+    /// the wrapping layer so a future refactor of HelperResponsePipe can't
+    /// silently re-introduce the deadlock without flipping a red test.
+    ///
+    /// Open HelperResponsePipe, start a Task that calls readLine() (parks
+    /// in read()), attach an external writer that never produces data
+    /// (stands in for the host-side writer in production), call close().
+    /// Expect prompt return.
+    func testHelperResponsePipeCloseUnblocksInFlightReadLine() async throws {
+        let helperPipe = try HelperResponsePipe(url: fifoURL)
+        try await helperPipe.open()
+
+        let externalWriter = try WritePipe(url: fifoURL)
+        try await externalWriter.open()
+
+        let readerTask = Task<String?, Never> {
+            return try? await helperPipe.readLine()
+        }
+
+        try await Task.sleep(for: .milliseconds(100))
+
+        let closeStartedAt = ContinuousClock.now
+        let elapsedOnComplete: ContinuousClock.Duration = await withTaskGroup(of: ContinuousClock.Duration?.self) { group in
+            group.addTask {
+                await helperPipe.close()
+                return ContinuousClock.now - closeStartedAt
+            }
+            group.addTask {
+                do {
+                    try await Task.sleep(for: .seconds(2))
+                } catch {
+                    return nil
+                }
+                try? await externalWriter.write("rescue\n")
+                return nil
+            }
+            var result: ContinuousClock.Duration = .seconds(0)
+            for await item in group {
+                if let item = item {
+                    result = item
+                    break
+                }
+            }
+            group.cancelAll()
+            await group.waitForAll()
+            return result
+        }
+
+        XCTAssertLessThan(elapsedOnComplete, .seconds(1), "HelperResponsePipe.close() should return promptly while a reader Task is parked in readLine() with an external writer attached; >=1s means the deadlock leaked through this layer")
+
+        _ = await readerTask.value
+        await externalWriter.close()
+    }
+
     private enum CloseOutcome {
         case closed
         case deadlineFired
