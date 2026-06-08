@@ -238,6 +238,106 @@ final class ReadPipeOverReadReproTests: XCTestCase {
         await reader.close()
     }
 
+    /// Close while a reader is mid-`read()` and an *external* writer is
+    /// still attached — the production deadlock case.
+    ///
+    /// The CLI hang from the field looked like this: the helper process has a
+    /// ReadPipe open on the response FIFO; the host app has its own
+    /// WritePipe open on the same FIFO (the writer side of the response
+    /// channel). When the CLI tears down, it calls `ReadPipe.close()` while
+    /// the reader Task is parked in `read(2)`.
+    ///
+    /// ReadPipe.close() first closes its own keepalive writer FD, but the
+    /// host's external writer FD keeps the kernel writer count positive, so
+    /// the blocked `read(2)` does NOT see EOF. Then close() calls
+    /// `fileHandle.close()` on the reader FD — and that close races against
+    /// the in-flight `read(2)` on the same FD. macOS does not deliver
+    /// EBADF/EINTR to the blocked reader, and the closer waits for the read
+    /// to release the FD. Deadlock.
+    ///
+    /// With the fix: ReadPipe.close() writes a sentinel byte through its
+    /// keepalive writer FD *before* closing it. The blocked `read(2)` returns
+    /// with that byte, `AsyncBytes.Iterator` yields, the reader Task's next
+    /// iteration falls through (cancelled or the byte is just consumed and a
+    /// subsequent read sees EOF), and the FD closes cleanly. `close()`
+    /// returns promptly even with an external writer still attached.
+    func testCloseUnblocksInFlightReadLineWithExternalWriterAttached() async throws {
+        let reader = try ReadPipe(url: fifoURL)
+        try await reader.open()
+
+        // External writer attached, but produces no data. This mirrors the
+        // host-side WritePipe staying open during CLI teardown.
+        let externalWriter = try WritePipe(url: fifoURL)
+        try await externalWriter.open()
+
+        // Start a reader Task that will park in read(). With an external
+        // writer attached, EOF is impossible — the only way out is real data
+        // or FD teardown.
+        let readerTask = Task<String?, Never> {
+            return try? await reader.readLine()
+        }
+
+        // Give the reader Task a moment to actually reach the read() syscall.
+        try await Task.sleep(for: .milliseconds(100))
+
+        // Race close() against a deadline. With the deadlock, close() never
+        // returns on its own — we rescue it from outside by writing through
+        // the external writer so the blocked read() returns. With the fix,
+        // close() returns promptly before the rescue is needed and we
+        // cancel the rescue path.
+        //
+        // Rescue path is required because Swift cannot cancel a Task that is
+        // parked in a non-cancellable syscall, so on regression we'd leak a
+        // hung Task across the rest of the test run.
+        let closeStartedAt = ContinuousClock.now
+        let elapsedOnComplete: ContinuousClock.Duration = await withTaskGroup(of: ContinuousClock.Duration?.self) { group in
+            group.addTask {
+                await reader.close()
+                return ContinuousClock.now - closeStartedAt
+            }
+            group.addTask {
+                // Deadline: sleep 2s, then if we weren't cancelled (i.e.
+                // close() is still hung), rescue it by writing data through
+                // the external writer. On the happy path, the close task
+                // returns first and we cancelAll() which cancels this sleep
+                // before we ever issue the write.
+                do {
+                    try await Task.sleep(for: .seconds(2))
+                } catch {
+                    return nil
+                }
+                try? await externalWriter.write("rescue\n")
+                return nil
+            }
+            // Wait for the first non-nil result (close completion) then
+            // cancel the deadline task. group.next() returns the first
+            // result; if it's the deadline returning nil we keep waiting.
+            var result: ContinuousClock.Duration = .seconds(0)
+            for await item in group {
+                if let item = item {
+                    result = item
+                    break
+                }
+            }
+            group.cancelAll()
+            await group.waitForAll()
+            return result
+        }
+
+        XCTAssertLessThan(elapsedOnComplete, .seconds(1), "ReadPipe.close() should return in well under a second while a reader Task is parked in read() and an external writer is still attached. Taking >=1s here means we hit the deadlock and only got unstuck by the external rescue write — the fix is not in place.")
+
+        // Drain the reader (it will have completed when close() torn down
+        // the FD — either after the sentinel write or after the rescue
+        // write, depending on path).
+        _ = await readerTask.value
+        await externalWriter.close()
+    }
+
+    private enum CloseOutcome {
+        case closed
+        case deadlineFired
+    }
+
     // MARK: - Helpers
 
     /// Reads up to `count` lines from `reader`, with a hard wall-clock

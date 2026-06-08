@@ -191,10 +191,37 @@ public actor ReadPipe: PipeReadable {
         }
     }
 
-    /// Closes the pipe
+    /// Closes the pipe.
+    ///
+    /// If a consumer Task is currently parked in `readLine()` (i.e. blocked
+    /// inside `read(2)` via `AsyncBytes.Iterator`), we cannot just close the
+    /// reader FD — `close(2)` on a FD that another thread is mid-`read(2)`
+    /// on does NOT return EBADF/EINTR to the reader on macOS, and the closer
+    /// waits for the read to release the FD. With an external writer still
+    /// attached to the FIFO, the kernel writer count stays positive so the
+    /// read never sees EOF either, and the two sides deadlock.
+    ///
+    /// To break this safely, we write a single sentinel byte through our own
+    /// keepalive writer FD before tearing anything down. The blocked
+    /// `read(2)` returns with that byte, `AsyncBytes.Iterator` yields back to
+    /// the consumer, and once it suspends again on a fresh `next()` call we
+    /// can drop the FileHandle without contention. Consumers (e.g.
+    /// `HelperResponsePipe`, `HostRequestPipe`) cancel their reader Task
+    /// before calling `close()`, so the sentinel byte typically arrives, the
+    /// iterator yields one stray byte/line, the loop sees `Task.isCancelled`,
+    /// and the reader exits cleanly. The sentinel write is best-effort: if
+    /// it fails (keepalive FD already gone, pipe full, etc.) we still
+    /// proceed with teardown — the consumer is responsible for handling a
+    /// stray decode-failed line in that window.
     public func close() async {
         lineIterator = nil
         if let fd = keepaliveWriterFD {
+            // Sentinel newline: keeps it parseable as an "empty line" by any
+            // AsyncLineSequence consumer rather than corrupting a real
+            // pending line. Best-effort — ignore short writes / errors;
+            // teardown proceeds either way.
+            var sentinel: UInt8 = 0x0A // '\n'
+            _ = Darwin.write(fd, &sentinel, 1)
             Darwin.close(fd)
             keepaliveWriterFD = nil
         }
