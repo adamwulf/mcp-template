@@ -179,8 +179,21 @@ public actor ReadPipe: PipeReadable {
     ///
     /// Uses a persistent `AsyncLineSequence` iterator so chunked reads from
     /// the underlying FD don't drop buffered lines between calls.
+    ///
+    /// **Cancellation:** if the calling Task is cancelled while parked in
+    /// `iterator.next()`, the underlying `AsyncBytes` iterator throws
+    /// `CancellationError`. That throw is the documented shutdown signal in
+    /// our reader-Task contract (consumer cancels its Task → consumer calls
+    /// `signalReaderWake()` → iterator yields → cancellation is observed),
+    /// so it is rethrown without logging and without being wrapped in
+    /// `ReadPipeError.readError`. Callers that loop on `readLine()` should
+    /// either let `CancellationError` propagate out of their loop or check
+    /// `Task.isCancelled` and exit cleanly. Any other thrown error is
+    /// treated as a real I/O failure: it is logged and wrapped as
+    /// `ReadPipeError.readError`.
     /// - Returns: A single line, or `nil` if the pipe has been closed.
-    /// - Throws: `ReadPipeError` if reading fails.
+    /// - Throws: `CancellationError` if the calling Task was cancelled;
+    ///   otherwise `ReadPipeError` if reading fails.
     public func readLine() async throws -> String? {
         guard fileHandle != nil, var iterator = lineIterator else {
             Logging.printError("Error: Pipe not opened")
@@ -191,6 +204,10 @@ public actor ReadPipe: PipeReadable {
             let line = try await iterator.next()
             lineIterator = iterator
             return line
+        } catch is CancellationError {
+            // Documented shutdown signal — rethrow cleanly, no error log.
+            lineIterator = iterator
+            throw CancellationError()
         } catch {
             lineIterator = iterator
             Logging.printError("Error reading line from pipe", error: error)

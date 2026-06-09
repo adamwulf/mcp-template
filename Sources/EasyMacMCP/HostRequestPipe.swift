@@ -91,6 +91,13 @@ public actor HostRequestPipe<Request: MCPRequestProtocol> {
                         }
                     }
                 }
+            } catch is CancellationError {
+                // Normal shutdown — `stopReading()` cancelled us and
+                // `signalReaderWake()` unblocked the parked read so the
+                // iterator could observe cancellation. Logged at info,
+                // not error.
+                logger?.info("HOST_REQUEST_PIPE: Read loop exited on cancellation")
+                isReading = false
             } catch {
                 logger?.error("Error in read loop: \(error.localizedDescription)")
                 isReading = false

@@ -71,6 +71,12 @@ public actor ResponseManager<Response: MCPResponseProtocol> {
                         }
                     }
                 }
+            } catch is CancellationError {
+                // Normal shutdown — `stopReading()` cancelled us and
+                // `signalReaderWake()` unblocked the parked read so the
+                // iterator could observe cancellation. Logged at info,
+                // not error.
+                logger?.info("RESPONSE_READER: Reader exited on cancellation")
             } catch {
                 logger?.error("RESPONSE_READER: Error in response reader: \(error)")
             }

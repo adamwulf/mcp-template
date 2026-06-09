@@ -1,5 +1,6 @@
 import XCTest
 import Foundation
+import Logging
 import MCP
 @testable import EasyMacMCP
 
@@ -1002,6 +1003,95 @@ final class ReadPipeOverReadReproTests: XCTestCase {
             }
         )
     }
+
+    // MARK: - Shutdown log-noise tests
+    //
+    // These tests pin down a separate but related contract: the documented
+    // shutdown sequence (cancel reader Task → signalReaderWake → await
+    // Task → close pipe) must not surface any error-level log lines. Two
+    // independent noise sources used to exist on this path:
+    //
+    //   1. `AsyncLineSequence.next()` throws `CancellationError` when its
+    //      enclosing Task is cancelled. `ReadPipe.readLine()` used to log
+    //      that as "Error reading line from pipe" and wrap it as
+    //      `ReadPipeError.readError`. The consumer's catch then logged it
+    //      a second time as "Error in response reader" / "Error in read
+    //      loop". Two error lines per successful CLI invocation.
+    //   2. `signalReaderWake()` writes a sentinel `\n` to unblock the
+    //      parked read. `AsyncLineSequence` interprets that as an empty
+    //      line and yields `""`. The consumer used to JSON-decode that
+    //      empty string, fail, and log "Failed to decode response" — a
+    //      third error line on every shutdown.
+    //
+    // The tests below install a `RecordingLogHandler` on the injected
+    // logger, drive the production shutdown sequence end-to-end, and
+    // assert no error-level events were emitted from the reader-Task
+    // catch or from the empty-line decode path. They are the regression
+    // backstop for both noise sources.
+
+    /// A clean `ResponseManager.stopReading()` after the reader Task has
+    /// parked in `readLine()` must not emit any error-level logs through
+    /// the injected logger. Catches both the `CancellationError` rethrow
+    /// from `ReadPipe.readLine()` (previously logged as "Error reading
+    /// line from pipe" and "Error in response reader") and the sentinel
+    /// empty-line case (previously logged as "Failed to decode response").
+    func testResponseManagerShutdownEmitsNoErrorLogs() async throws {
+        let recorder = LogRecorder()
+        let logger = Logger(label: "test.response-manager-shutdown") { _ in
+            RecordingLogHandler(recorder: recorder)
+        }
+
+        let helperPipe = try HelperResponsePipe(url: fifoURL, logger: logger)
+        let manager = ResponseManager<StubResponse>(responsePipe: helperPipe, logger: logger)
+        try await manager.startReading()
+
+        // External writer attached but silent — mirrors the host-side
+        // WritePipe staying open during CLI teardown.
+        let externalWriter = try WritePipe(url: fifoURL)
+        try await externalWriter.open()
+
+        try await Task.sleep(for: .milliseconds(100))
+        await manager.stopReading()
+
+        let errors = recorder.eventsAtLevel(.error)
+        XCTAssertTrue(
+            errors.isEmpty,
+            "ResponseManager shutdown must not log at error level — got \(errors.count): \(errors.map(\.message).joined(separator: " | "))"
+        )
+
+        await externalWriter.close()
+    }
+
+    /// Same shape as the ResponseManager test, but for `HostRequestPipe`.
+    /// The request-side reader-Task catch had the same noise problem and
+    /// the same fix; this test ensures the request-side shutdown is also
+    /// quiet.
+    func testHostRequestPipeShutdownEmitsNoErrorLogs() async throws {
+        let recorder = LogRecorder()
+        let logger = Logger(label: "test.host-request-shutdown") { _ in
+            RecordingLogHandler(recorder: recorder)
+        }
+
+        let readPipe = try ReadPipe(url: fifoURL)
+        let hostPipe = HostRequestPipe<StubRequest>(readPipe: readPipe, logger: logger)
+        try await hostPipe.open()
+
+        let externalWriter = try WritePipe(url: fifoURL)
+        try await externalWriter.open()
+
+        await hostPipe.startReading { (_: StubRequest) in }
+        try await Task.sleep(for: .milliseconds(100))
+        await hostPipe.close()
+
+        let errors = recorder.eventsAtLevel(.error)
+        XCTAssertTrue(
+            errors.isEmpty,
+            "HostRequestPipe shutdown must not log at error level — got \(errors.count): \(errors.map(\.message).joined(separator: " | "))"
+        )
+
+        await externalWriter.close()
+    }
+
 }
 
 /// Test-only ordered append actor. Tests use it to record when handlers
@@ -1045,5 +1135,58 @@ private actor AsyncSignal {
         for continuation in pending {
             continuation.resume()
         }
+    }
+}
+
+/// Thread-safe in-memory store of log events captured by
+/// `RecordingLogHandler`. Tests construct a `Logger` whose factory closure
+/// returns a `RecordingLogHandler` wired to a shared `LogRecorder`, run
+/// the production code, then query `eventsAtLevel(_:)` to assert
+/// expectations.
+///
+/// Recording is synchronous (`NSLock`-guarded) rather than actor-isolated
+/// so the `LogHandler.log(...)` call site can record without spawning a
+/// Task — that avoids a race where the assertion runs before the captured
+/// event reaches the actor.
+private final class LogRecorder: @unchecked Sendable {
+    struct CapturedEvent: Sendable {
+        let level: Logger.Level
+        let message: String
+    }
+
+    private let lock = NSLock()
+    private var events: [CapturedEvent] = []
+
+    func record(level: Logger.Level, message: String) {
+        lock.lock()
+        events.append(CapturedEvent(level: level, message: message))
+        lock.unlock()
+    }
+
+    func eventsAtLevel(_ level: Logger.Level) -> [CapturedEvent] {
+        lock.lock()
+        defer { lock.unlock() }
+        return events.filter { $0.level == level }
+    }
+}
+
+/// `LogHandler` implementation that funnels every emitted event into a
+/// shared `LogRecorder`. The handler logs at every level (no filtering at
+/// this layer) so the test can decide what counts as noise. Required
+/// mutable `metadata`/`logLevel`/`metadataProvider` properties exist only
+/// to satisfy the protocol.
+private struct RecordingLogHandler: LogHandler {
+    let recorder: LogRecorder
+    var metadata: Logger.Metadata = [:]
+    var logLevel: Logger.Level = .trace
+    var metadataProvider: Logger.MetadataProvider?
+
+    subscript(metadataKey key: String) -> Logger.Metadata.Value? {
+        get { metadata[key] }
+        set { metadata[key] = newValue }
+    }
+
+    func log(event: LogEvent) {
+        recorder.record(level: event.level, message: event.message.description)
     }
 }
