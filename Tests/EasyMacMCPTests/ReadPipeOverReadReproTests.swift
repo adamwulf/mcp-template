@@ -23,6 +23,26 @@ private struct StubResponse: MCPResponseProtocol {
     func asListToolsResult() -> MCP.ListTools.Result? { nil }
 }
 
+/// Minimal `MCPRequestProtocol` conformance for tests that exercise the
+/// `HostRequestPipe.startReading(...)` generic API. The reader Task will
+/// never actually decode a real request — the pipe stays silent except
+/// for the sentinel byte that `signalReaderWake()` injects during
+/// shutdown.
+private struct StubRequest: MCPRequestProtocol {
+    let helperId: String
+    let messageId: String
+    var isInitialize: Bool { false }
+    var isDeinitialize: Bool { false }
+
+    static func create(helperId: String, messageId: String, parameters: MCP.CallTool.Parameters) throws -> StubRequest {
+        StubRequest(helperId: helperId, messageId: messageId)
+    }
+
+    static func makeListToolsRequest(helperId: String, messageId: String) -> StubRequest {
+        StubRequest(helperId: helperId, messageId: messageId)
+    }
+}
+
 /// Standalone repro for the suspected `ReadPipe.readLine()` over-read bug.
 ///
 /// Hypothesis (see `/tmp/easymacmcp-readline-bug-notes.md`): each call to
@@ -516,6 +536,110 @@ final class ReadPipeOverReadReproTests: XCTestCase {
         }
 
         XCTAssertLessThan(elapsedOnComplete, .seconds(1), "HelperResponsePipe.close() should return promptly while its internal reader Task is parked in readLine() with an external writer attached; >=1s means the cancel → signalReaderWake → await sequence inside close()/stopReading() isn't unblocking the dispatch_io reader")
+
+        await externalWriter.close()
+    }
+
+    /// ResponseManager.stopReading() while its internal reader Task is
+    /// parked in readLine() — the exact production code path from the
+    /// original CLI-hang thread dump.
+    ///
+    /// ResponseManager wraps HelperResponsePipe, owns its own reader Task
+    /// (`responseReaderTask`), and calls `responsePipe.readLine()` in a
+    /// loop. When the helper shuts down (the thread dump's
+    /// `ResponseManager.stopReading()` frame), the manager must cancel
+    /// the reader Task, signal the wake, await the Task to exit, and
+    /// then close the pipe. This test pins down the production sequence
+    /// end-to-end.
+    func testResponseManagerStopReadingUnblocksWithExternalWriterAttached() async throws {
+        let helperPipe = try HelperResponsePipe(url: fifoURL)
+        let manager = ResponseManager<StubResponse>(responsePipe: helperPipe)
+        try await manager.startReading()
+
+        // External writer attached, but produces no data — mirrors the
+        // host-side WritePipe staying open during CLI teardown.
+        let externalWriter = try WritePipe(url: fifoURL)
+        try await externalWriter.open()
+
+        // Give the manager's internal Task a moment to park in read().
+        try await Task.sleep(for: .milliseconds(100))
+
+        let stopStartedAt = ContinuousClock.now
+        let elapsedOnComplete: ContinuousClock.Duration = await withTaskGroup(of: ContinuousClock.Duration?.self) { group in
+            group.addTask {
+                await manager.stopReading()
+                return ContinuousClock.now - stopStartedAt
+            }
+            group.addTask {
+                do {
+                    try await Task.sleep(for: .seconds(2))
+                } catch {
+                    return nil
+                }
+                try? await externalWriter.write("rescue\n")
+                return nil
+            }
+            var result: ContinuousClock.Duration = .seconds(0)
+            for await item in group {
+                if let item = item {
+                    result = item
+                    break
+                }
+            }
+            group.cancelAll()
+            await group.waitForAll()
+            return result
+        }
+
+        XCTAssertLessThan(elapsedOnComplete, .seconds(1), "ResponseManager.stopReading() should return promptly while its internal reader Task is parked in readLine() with an external writer attached. This is the exact CLI-hang path from the original report; >=1s means a regression in the shutdown sequence.")
+
+        await externalWriter.close()
+    }
+
+    /// HostRequestPipe.close() while its internal reader Task is parked
+    /// in readLine() — symmetric to the HelperResponsePipe case but on
+    /// the request side. The host app uses HostRequestPipe to receive
+    /// incoming requests from helpers; same shutdown contract applies.
+    func testHostRequestPipeCloseUnblocksInternalReaderTask() async throws {
+        let readPipe = try ReadPipe(url: fifoURL)
+        let hostPipe = HostRequestPipe<StubRequest>(readPipe: readPipe)
+        try await hostPipe.open()
+
+        let externalWriter = try WritePipe(url: fifoURL)
+        try await externalWriter.open()
+
+        // Start the internal reader loop with a no-op handler.
+        await hostPipe.startReading { (_: StubRequest) in }
+        try await Task.sleep(for: .milliseconds(100))
+
+        let closeStartedAt = ContinuousClock.now
+        let elapsedOnComplete: ContinuousClock.Duration = await withTaskGroup(of: ContinuousClock.Duration?.self) { group in
+            group.addTask {
+                await hostPipe.close()
+                return ContinuousClock.now - closeStartedAt
+            }
+            group.addTask {
+                do {
+                    try await Task.sleep(for: .seconds(2))
+                } catch {
+                    return nil
+                }
+                try? await externalWriter.write("rescue\n")
+                return nil
+            }
+            var result: ContinuousClock.Duration = .seconds(0)
+            for await item in group {
+                if let item = item {
+                    result = item
+                    break
+                }
+            }
+            group.cancelAll()
+            await group.waitForAll()
+            return result
+        }
+
+        XCTAssertLessThan(elapsedOnComplete, .seconds(1), "HostRequestPipe.close() should return promptly while its internal reader Task is parked in readLine() with an external writer attached; >=1s means the request-side shutdown sequence has drifted from the response-side one.")
 
         await externalWriter.close()
     }
