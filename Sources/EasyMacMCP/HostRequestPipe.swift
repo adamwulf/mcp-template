@@ -48,9 +48,30 @@ public actor HostRequestPipe<Request: MCPRequestProtocol> {
 
     /// Start continuously reading requests from the pipe.
     ///
-    /// Each request is dispatched in its own Task so handlers run concurrently and the
-    /// read loop never blocks. Handler ordering is not guaranteed; MCP matches by
-    /// `messageId`.
+    /// Lifecycle requests (`isInitialize`, `isDeinitialize`) are dispatched inline so
+    /// the read loop blocks until the handler completes. Non-lifecycle requests are
+    /// dispatched in their own Task and run concurrently with the read loop and with
+    /// each other.
+    ///
+    /// Why `initialize` is inline: `EasyMCPHost` requires the response pipe for a
+    /// helperId to be opened and registered before any subsequent tool-call request
+    /// from that helperId is dispatched. Without this serialization, a tool-call
+    /// request that arrives immediately after `initialize` in the FIFO can run
+    /// before `setupResponsePipe` finishes, find no pipe registered, and return
+    /// silently — the helper then times out waiting for a response.
+    ///
+    /// Why `deinitialize` is inline: the host tears the response pipe down
+    /// immediately when deinitialize arrives. In-flight tool-call Tasks for the
+    /// same helperId that are still running when deinitialize lands will fail to
+    /// write their responses (the pipe is gone) and silently drop them. This is
+    /// intentional — a helper that sends deinitialize before all of its in-flight
+    /// requests have been answered is signaling that it no longer cares about
+    /// those responses.
+    ///
+    /// Why tool calls run concurrently: a single helper (e.g. Claude Desktop) can
+    /// invoke multiple tools in parallel. MCP matches requests to responses by
+    /// `messageId`, so handler reordering is safe at the protocol level for
+    /// non-lifecycle requests.
     ///
     /// - Parameter requestHandler: Callback for handling received requests
     func startReading(requestHandler: @Sendable @escaping (Request) async -> Void) async {
@@ -63,7 +84,11 @@ public actor HostRequestPipe<Request: MCPRequestProtocol> {
             do {
                 while isReading && !Task.isCancelled {
                     if let request = try await readRequest() {
-                        Task { await requestHandler(request) }
+                        if request.isInitialize || request.isDeinitialize {
+                            await requestHandler(request)
+                        } else {
+                            Task { await requestHandler(request) }
+                        }
                     }
                 }
             } catch {

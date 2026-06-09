@@ -43,6 +43,33 @@ private struct StubRequest: MCPRequestProtocol {
     }
 }
 
+/// MCPRequestProtocol conformance used by the dispatch-ordering tests. Unlike
+/// `StubRequest`, this struct's `isInitialize`/`isDeinitialize` flags are
+/// stored properties so a test can construct a mix of lifecycle and
+/// non-lifecycle requests, write them to the FIFO as JSON, and let
+/// `HostRequestPipe.readRequest()` decode them back on the host side.
+private struct DispatchTestRequest: MCPRequestProtocol, Codable {
+    let helperId: String
+    let messageId: String
+    let isInitialize: Bool
+    let isDeinitialize: Bool
+
+    init(helperId: String, messageId: String, isInitialize: Bool = false, isDeinitialize: Bool = false) {
+        self.helperId = helperId
+        self.messageId = messageId
+        self.isInitialize = isInitialize
+        self.isDeinitialize = isDeinitialize
+    }
+
+    static func create(helperId: String, messageId: String, parameters: MCP.CallTool.Parameters) throws -> DispatchTestRequest {
+        DispatchTestRequest(helperId: helperId, messageId: messageId)
+    }
+
+    static func makeListToolsRequest(helperId: String, messageId: String) -> DispatchTestRequest {
+        DispatchTestRequest(helperId: helperId, messageId: messageId)
+    }
+}
+
 /// Standalone repro for the suspected `ReadPipe.readLine()` over-read bug.
 ///
 /// Hypothesis (see `/tmp/easymacmcp-readline-bug-notes.md`): each call to
@@ -709,5 +736,314 @@ final class ReadPipeOverReadReproTests: XCTestCase {
     private enum ReadGroupResult {
         case reads([String?])
         case deadlineFired
+    }
+
+    // MARK: - Dispatch ordering tests
+    //
+    // These tests pin down the per-request dispatch invariants in
+    // `HostRequestPipe.startReading(...)`:
+    //
+    //  - `initialize` is dispatched inline (read loop blocks until handler
+    //    returns), so any subsequent same-helper request observes the host
+    //    state that `initialize` set up (e.g. the response pipe being
+    //    opened and registered).
+    //  - `deinitialize` is dispatched inline (read loop blocks until handler
+    //    returns), so the response pipe teardown runs immediately even if
+    //    the helper had in-flight tool-call handlers. Those in-flight
+    //    handlers may fail to write back — that's the documented contract:
+    //    a helper that wanted those responses shouldn't have sent
+    //    deinitialize early.
+    //  - Non-lifecycle requests are dispatched in their own Task, so
+    //    handlers run concurrently with the read loop and with each
+    //    other. This preserves the parallel-tool-call workload that
+    //    commit 4c00a64 was originally optimizing for.
+    //
+    // The tests below exercise each of these invariants in isolation.
+
+    /// Helper to drive a sequence of pre-written JSON request lines through
+    /// `HostRequestPipe` and observe the dispatcher's behavior via a handler
+    /// closure. The pipe is opened, a writer is attached, the requests are
+    /// pre-queued in the FIFO before `startReading()` is called, then the
+    /// reader starts and the supplied `body` runs the assertions. Always
+    /// tears everything down on exit.
+    private func withDispatchHarness(
+        preQueuedRequests: [DispatchTestRequest],
+        handler: @escaping @Sendable (DispatchTestRequest) async -> Void,
+        body: (_ hostPipe: HostRequestPipe<DispatchTestRequest>, _ writer: WritePipe) async throws -> Void
+    ) async throws {
+        let readPipe = try ReadPipe(url: fifoURL)
+        let hostPipe = HostRequestPipe<DispatchTestRequest>(readPipe: readPipe)
+        try await hostPipe.open()
+
+        let writer = try WritePipe(url: fifoURL)
+        try await writer.open()
+
+        let encoder = JSONEncoder()
+        for request in preQueuedRequests {
+            var line = try encoder.encode(request)
+            line.append(10) // newline
+            try await writer.write(line)
+        }
+
+        await hostPipe.startReading(requestHandler: handler)
+
+        do {
+            try await body(hostPipe, writer)
+        } catch {
+            await hostPipe.close()
+            await writer.close()
+            throw error
+        }
+        await hostPipe.close()
+        await writer.close()
+    }
+
+    /// An `initialize` request followed immediately by a tool-call request
+    /// for the same helperId must be dispatched in order — the tool-call
+    /// handler must not start until the `initialize` handler has fully
+    /// returned. This is the production invariant that broke with commit
+    /// 4c00a64 (when both requests were Task-dispatched, the tool-call's
+    /// Task could run before the initialize's Task finished opening the
+    /// response pipe, the tool-call handler then found no pipe registered,
+    /// returned silently, and the helper timed out).
+    func testInitializeBlocksSubsequentSameHelperRequest() async throws {
+        let helperId = "helper-A"
+        let initializeStarted = AsyncOrderRecorder()
+        let initializeFinished = AsyncOrderRecorder()
+        let toolCallStarted = AsyncOrderRecorder()
+
+        let preQueued: [DispatchTestRequest] = [
+            DispatchTestRequest(helperId: helperId, messageId: "m-init", isInitialize: true),
+            DispatchTestRequest(helperId: helperId, messageId: "m-tool")
+        ]
+
+        let toolCallObserved = expectation(description: "tool-call handler ran")
+
+        try await withDispatchHarness(
+            preQueuedRequests: preQueued,
+            handler: { request in
+                if request.isInitialize {
+                    await initializeStarted.record("init-start")
+                    // Simulate the host doing pipe setup work — equivalent to
+                    // `setupResponsePipe(for:)` opening a FIFO. The whole
+                    // point of the inline-dispatch invariant is that the
+                    // tool-call handler must wait for this to finish.
+                    try? await Task.sleep(for: .milliseconds(150))
+                    await initializeFinished.record("init-end")
+                } else {
+                    await toolCallStarted.record("tool-start")
+                    toolCallObserved.fulfill()
+                }
+            },
+            body: { _, _ in
+                await fulfillment(of: [toolCallObserved], timeout: 2.0)
+            }
+        )
+
+        let initStartIdx = await initializeStarted.firstIndex(of: "init-start")
+        let initEndIdx = await initializeFinished.firstIndex(of: "init-end")
+        let toolStartIdx = await toolCallStarted.firstIndex(of: "tool-start")
+
+        XCTAssertNotNil(initStartIdx, "initialize handler should have run")
+        XCTAssertNotNil(initEndIdx, "initialize handler should have finished")
+        XCTAssertNotNil(toolStartIdx, "tool-call handler should have run")
+
+        if let initEnd = initEndIdx, let toolStart = toolStartIdx {
+            // We measured init-end and tool-start on separate AsyncOrderRecorders
+            // (so their indices aren't directly comparable). Instead, re-derive
+            // the ordering via the absolute timestamps each recorder stamped.
+            let initEndAt = await initializeFinished.timestamp(at: initEnd)
+            let toolStartAt = await toolCallStarted.timestamp(at: toolStart)
+            XCTAssertLessThan(initEndAt, toolStartAt, "tool-call handler started before initialize handler finished — the read loop did not wait for initialize to complete before dispatching the next request, which means EasyMCPHost.setupResponsePipe could race against the first real tool call.")
+        }
+    }
+
+    /// Two non-lifecycle (tool-call) requests from the same helper must run
+    /// concurrently — the second must be able to start while the first is
+    /// still in its handler. This is the parallel-tool-call workload that
+    /// commit 4c00a64 originally enabled and that the current dispatch
+    /// shape continues to support.
+    func testNonLifecycleRequestsRunConcurrently() async throws {
+        let helperId = "helper-A"
+        let firstStarted = expectation(description: "first handler started")
+        let secondStarted = expectation(description: "second handler started")
+        let firstFinish = AsyncSignal()
+
+        let preQueued: [DispatchTestRequest] = [
+            DispatchTestRequest(helperId: helperId, messageId: "m-1"),
+            DispatchTestRequest(helperId: helperId, messageId: "m-2")
+        ]
+
+        try await withDispatchHarness(
+            preQueuedRequests: preQueued,
+            handler: { request in
+                if request.messageId == "m-1" {
+                    firstStarted.fulfill()
+                    // Block until the test releases us. If dispatch were
+                    // serial, the second request's handler would never get
+                    // to fulfill `secondStarted` and the test would time
+                    // out at `fulfillment(of: [secondStarted])`.
+                    await firstFinish.wait()
+                } else {
+                    secondStarted.fulfill()
+                }
+            },
+            body: { _, _ in
+                await fulfillment(of: [firstStarted, secondStarted], timeout: 2.0)
+                await firstFinish.signal()
+            }
+        )
+    }
+
+    /// A non-lifecycle handler that takes a long time must not block the
+    /// read loop. The read loop should continue pulling subsequent requests
+    /// off the pipe and dispatching them. We assert this by writing a
+    /// blocking request followed by a fast request and showing that the
+    /// fast request's handler runs before we release the blocking one.
+    func testReadLoopKeepsReadingDuringSlowHandler() async throws {
+        let helperId = "helper-A"
+        let blockerStarted = expectation(description: "blocker started")
+        let fastDispatched = expectation(description: "fast handler ran")
+        let blockerRelease = AsyncSignal()
+
+        let preQueued: [DispatchTestRequest] = [
+            DispatchTestRequest(helperId: helperId, messageId: "m-blocker"),
+            DispatchTestRequest(helperId: helperId, messageId: "m-fast")
+        ]
+
+        try await withDispatchHarness(
+            preQueuedRequests: preQueued,
+            handler: { request in
+                if request.messageId == "m-blocker" {
+                    blockerStarted.fulfill()
+                    await blockerRelease.wait()
+                } else {
+                    fastDispatched.fulfill()
+                }
+            },
+            body: { _, _ in
+                // If the read loop were waiting for the blocker's handler to
+                // finish before reading the next line, `fastDispatched`
+                // would never fulfill and we'd hit the timeout.
+                await fulfillment(of: [blockerStarted, fastDispatched], timeout: 2.0)
+                await blockerRelease.signal()
+            }
+        )
+    }
+
+    /// A slow non-lifecycle handler for helper A must not block dispatch of
+    /// a request from helper B. Cross-helper concurrency is the design
+    /// payoff of the per-request Task dispatch — without it, one slow
+    /// helper could starve every other helper sharing the central pipe.
+    func testRequestsFromDifferentHelpersAreNotSerialized() async throws {
+        let slowStarted = expectation(description: "slow helper handler started")
+        let fastDispatched = expectation(description: "fast helper handler ran")
+        let slowRelease = AsyncSignal()
+
+        let preQueued: [DispatchTestRequest] = [
+            DispatchTestRequest(helperId: "helper-A", messageId: "m-slow"),
+            DispatchTestRequest(helperId: "helper-B", messageId: "m-fast")
+        ]
+
+        try await withDispatchHarness(
+            preQueuedRequests: preQueued,
+            handler: { request in
+                if request.helperId == "helper-A" {
+                    slowStarted.fulfill()
+                    await slowRelease.wait()
+                } else {
+                    fastDispatched.fulfill()
+                }
+            },
+            body: { _, _ in
+                await fulfillment(of: [slowStarted, fastDispatched], timeout: 2.0)
+                await slowRelease.signal()
+            }
+        )
+    }
+
+    /// `deinitialize` is dispatched inline (the read loop blocks until its
+    /// handler returns), and it does NOT wait for previously-dispatched
+    /// non-lifecycle handlers from the same helper to finish. This pins
+    /// down the documented contract: a helper that sends `deinitialize`
+    /// while it still has in-flight tool-call requests has explicitly
+    /// signaled that it no longer cares about those responses; the host
+    /// is free to tear down the response pipe immediately.
+    ///
+    /// Test shape: queue [tool-call, deinitialize]. The tool-call handler
+    /// parks on a signal that the test never releases until after it
+    /// observes the deinitialize handler running. If deinitialize were
+    /// gated on the in-flight tool-call finishing, the deinit handler
+    /// would never run and `deinitObserved` would time out.
+    func testDeinitializeDoesNotWaitForInFlightToolCalls() async throws {
+        let helperId = "helper-A"
+        let toolStarted = expectation(description: "tool-call started")
+        let deinitObserved = expectation(description: "deinit handler ran")
+        let toolRelease = AsyncSignal()
+
+        let preQueued: [DispatchTestRequest] = [
+            DispatchTestRequest(helperId: helperId, messageId: "m-tool"),
+            DispatchTestRequest(helperId: helperId, messageId: "m-deinit", isDeinitialize: true)
+        ]
+
+        try await withDispatchHarness(
+            preQueuedRequests: preQueued,
+            handler: { request in
+                if request.isDeinitialize {
+                    deinitObserved.fulfill()
+                } else {
+                    toolStarted.fulfill()
+                    await toolRelease.wait()
+                }
+            },
+            body: { _, _ in
+                await fulfillment(of: [toolStarted, deinitObserved], timeout: 2.0)
+                await toolRelease.signal()
+            }
+        )
+    }
+}
+
+/// Test-only ordered append actor. Tests use it to record when handlers
+/// observe a particular state in dispatch order and then assert on the
+/// resulting sequence after the fact. Each `record(_:)` also stamps a
+/// monotonic timestamp so cross-recorder ordering can be reconstructed.
+private actor AsyncOrderRecorder {
+    private var entries: [(label: String, at: ContinuousClock.Instant)] = []
+
+    func record(_ label: String) {
+        entries.append((label: label, at: ContinuousClock.now))
+    }
+
+    func firstIndex(of label: String) -> Int? {
+        entries.firstIndex(where: { $0.label == label })
+    }
+
+    func timestamp(at index: Int) -> ContinuousClock.Instant {
+        entries[index].at
+    }
+}
+
+/// One-shot async gate. `wait()` suspends until `signal()` is called.
+/// `signal()` is idempotent; subsequent calls are no-ops.
+private actor AsyncSignal {
+    private var continuations: [CheckedContinuation<Void, Never>] = []
+    private var fired = false
+
+    func wait() async {
+        if fired { return }
+        await withCheckedContinuation { continuation in
+            continuations.append(continuation)
+        }
+    }
+
+    func signal() {
+        guard !fired else { return }
+        fired = true
+        let pending = continuations
+        continuations.removeAll()
+        for continuation in pending {
+            continuation.resume()
+        }
     }
 }
