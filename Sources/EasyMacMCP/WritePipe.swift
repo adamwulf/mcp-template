@@ -123,7 +123,15 @@ public actor WritePipe: PipeWritable {
         fileHandle = FileHandle(fileDescriptor: fileDescriptor, closeOnDealloc: true)
     }
 
-    /// Writes data to the pipe
+    /// Writes data to the pipe.
+    ///
+    /// When multiple `WritePipe` instances share one FIFO (e.g. each helper
+    /// process writes to the central request pipe), cross-writer atomicity
+    /// relies on POSIX `PIPE_BUF` — writes ≤ `PIPE_BUF` bytes never interleave
+    /// at the kernel level. `PIPE_BUF` is 65536 on Darwin/Linux, which
+    /// accommodates typical JSON request lines. Larger payloads can interleave
+    /// and would need explicit framing (length prefix, per-helper FIFO).
+    ///
     /// - Parameter data: The data to write
     /// - Throws: WritePipeError if writing fails
     public func write(_ data: Data) throws {

@@ -1,5 +1,6 @@
 import XCTest
 import Foundation
+import Logging
 import MCP
 @testable import EasyMacMCP
 
@@ -40,6 +41,31 @@ private struct StubRequest: MCPRequestProtocol {
 
     static func makeListToolsRequest(helperId: String, messageId: String) -> StubRequest {
         StubRequest(helperId: helperId, messageId: messageId)
+    }
+}
+
+/// Variant of `StubRequest` with mutable `isInitialize`/`isDeinitialize`
+/// flags so the dispatch tests can encode a mix of lifecycle and
+/// non-lifecycle requests as JSON and let `HostRequestPipe` decode them.
+private struct DispatchTestRequest: MCPRequestProtocol, Codable {
+    let helperId: String
+    let messageId: String
+    let isInitialize: Bool
+    let isDeinitialize: Bool
+
+    init(helperId: String, messageId: String, isInitialize: Bool = false, isDeinitialize: Bool = false) {
+        self.helperId = helperId
+        self.messageId = messageId
+        self.isInitialize = isInitialize
+        self.isDeinitialize = isDeinitialize
+    }
+
+    static func create(helperId: String, messageId: String, parameters: MCP.CallTool.Parameters) throws -> DispatchTestRequest {
+        DispatchTestRequest(helperId: helperId, messageId: messageId)
+    }
+
+    static func makeListToolsRequest(helperId: String, messageId: String) -> DispatchTestRequest {
+        DispatchTestRequest(helperId: helperId, messageId: messageId)
     }
 }
 
@@ -709,5 +735,359 @@ final class ReadPipeOverReadReproTests: XCTestCase {
     private enum ReadGroupResult {
         case reads([String?])
         case deadlineFired
+    }
+
+    // MARK: - Dispatch ordering tests
+
+    /// Pre-queues `preQueuedRequests` as JSON lines in the FIFO, then starts
+    /// the reader with `handler` and runs `body`. Always tears down on exit.
+    private func withDispatchHarness(
+        preQueuedRequests: [DispatchTestRequest],
+        handler: @escaping @Sendable (DispatchTestRequest) async -> Void,
+        body: (_ hostPipe: HostRequestPipe<DispatchTestRequest>, _ writer: WritePipe) async throws -> Void
+    ) async throws {
+        let readPipe = try ReadPipe(url: fifoURL)
+        let hostPipe = HostRequestPipe<DispatchTestRequest>(readPipe: readPipe)
+        try await hostPipe.open()
+
+        let writer = try WritePipe(url: fifoURL)
+        try await writer.open()
+
+        let encoder = JSONEncoder()
+        for request in preQueuedRequests {
+            var line = try encoder.encode(request)
+            line.append(10) // newline
+            try await writer.write(line)
+        }
+
+        await hostPipe.startReading(requestHandler: handler)
+
+        do {
+            try await body(hostPipe, writer)
+        } catch {
+            await hostPipe.close()
+            await writer.close()
+            throw error
+        }
+        await hostPipe.close()
+        await writer.close()
+    }
+
+    /// Initialize must fully complete before a same-helperId tool-call is
+    /// dispatched. Commit 4c00a64 broke this by Task-dispatching every
+    /// request, letting the tool-call run before `setupResponsePipe`
+    /// finished — the helper then timed out with no response.
+    func testInitializeBlocksSubsequentSameHelperRequest() async throws {
+        let helperId = "helper-A"
+        let initializeStarted = AsyncOrderRecorder()
+        let initializeFinished = AsyncOrderRecorder()
+        let toolCallStarted = AsyncOrderRecorder()
+
+        let preQueued: [DispatchTestRequest] = [
+            DispatchTestRequest(helperId: helperId, messageId: "m-init", isInitialize: true),
+            DispatchTestRequest(helperId: helperId, messageId: "m-tool")
+        ]
+
+        let toolCallObserved = expectation(description: "tool-call handler ran")
+
+        try await withDispatchHarness(
+            preQueuedRequests: preQueued,
+            handler: { request in
+                if request.isInitialize {
+                    await initializeStarted.record("init-start")
+                    // Stands in for `setupResponsePipe(for:)` doing real work.
+                    try? await Task.sleep(for: .milliseconds(150))
+                    await initializeFinished.record("init-end")
+                } else {
+                    await toolCallStarted.record("tool-start")
+                    toolCallObserved.fulfill()
+                }
+            },
+            body: { _, _ in
+                await fulfillment(of: [toolCallObserved], timeout: 2.0)
+            }
+        )
+
+        let initStartIdx = await initializeStarted.firstIndex(of: "init-start")
+        let initEndIdx = await initializeFinished.firstIndex(of: "init-end")
+        let toolStartIdx = await toolCallStarted.firstIndex(of: "tool-start")
+
+        XCTAssertNotNil(initStartIdx, "initialize handler should have run")
+        XCTAssertNotNil(initEndIdx, "initialize handler should have finished")
+        XCTAssertNotNil(toolStartIdx, "tool-call handler should have run")
+
+        if let initEnd = initEndIdx, let toolStart = toolStartIdx {
+            // Indices come from separate recorders; compare via absolute timestamps.
+            let initEndAt = await initializeFinished.timestamp(at: initEnd)
+            let toolStartAt = await toolCallStarted.timestamp(at: toolStart)
+            XCTAssertLessThan(initEndAt, toolStartAt, "tool-call handler started before initialize handler finished — the read loop did not wait for initialize to complete before dispatching the next request, which means EasyMCPHost.setupResponsePipe could race against the first real tool call.")
+        }
+    }
+
+    /// Two same-helper tool calls must run concurrently — preserves the
+    /// parallel-tool-call workload enabled by 4c00a64.
+    func testNonLifecycleRequestsRunConcurrently() async throws {
+        let helperId = "helper-A"
+        let firstStarted = expectation(description: "first handler started")
+        let secondStarted = expectation(description: "second handler started")
+        let firstFinish = AsyncSignal()
+
+        let preQueued: [DispatchTestRequest] = [
+            DispatchTestRequest(helperId: helperId, messageId: "m-1"),
+            DispatchTestRequest(helperId: helperId, messageId: "m-2")
+        ]
+
+        try await withDispatchHarness(
+            preQueuedRequests: preQueued,
+            handler: { request in
+                if request.messageId == "m-1" {
+                    firstStarted.fulfill()
+                    await firstFinish.wait()
+                } else {
+                    secondStarted.fulfill()
+                }
+            },
+            body: { _, _ in
+                await fulfillment(of: [firstStarted, secondStarted], timeout: 2.0)
+                await firstFinish.signal()
+            }
+        )
+    }
+
+    /// A slow non-lifecycle handler must not block the read loop from
+    /// dispatching subsequent requests.
+    func testReadLoopKeepsReadingDuringSlowHandler() async throws {
+        let helperId = "helper-A"
+        let blockerStarted = expectation(description: "blocker started")
+        let fastDispatched = expectation(description: "fast handler ran")
+        let blockerRelease = AsyncSignal()
+
+        let preQueued: [DispatchTestRequest] = [
+            DispatchTestRequest(helperId: helperId, messageId: "m-blocker"),
+            DispatchTestRequest(helperId: helperId, messageId: "m-fast")
+        ]
+
+        try await withDispatchHarness(
+            preQueuedRequests: preQueued,
+            handler: { request in
+                if request.messageId == "m-blocker" {
+                    blockerStarted.fulfill()
+                    await blockerRelease.wait()
+                } else {
+                    fastDispatched.fulfill()
+                }
+            },
+            body: { _, _ in
+                await fulfillment(of: [blockerStarted, fastDispatched], timeout: 2.0)
+                await blockerRelease.signal()
+            }
+        )
+    }
+
+    /// A slow handler for helper A must not block dispatch of a request
+    /// from helper B — otherwise one slow helper starves every other
+    /// helper sharing the central pipe.
+    func testRequestsFromDifferentHelpersAreNotSerialized() async throws {
+        let slowStarted = expectation(description: "slow helper handler started")
+        let fastDispatched = expectation(description: "fast helper handler ran")
+        let slowRelease = AsyncSignal()
+
+        let preQueued: [DispatchTestRequest] = [
+            DispatchTestRequest(helperId: "helper-A", messageId: "m-slow"),
+            DispatchTestRequest(helperId: "helper-B", messageId: "m-fast")
+        ]
+
+        try await withDispatchHarness(
+            preQueuedRequests: preQueued,
+            handler: { request in
+                if request.helperId == "helper-A" {
+                    slowStarted.fulfill()
+                    await slowRelease.wait()
+                } else {
+                    fastDispatched.fulfill()
+                }
+            },
+            body: { _, _ in
+                await fulfillment(of: [slowStarted, fastDispatched], timeout: 2.0)
+                await slowRelease.signal()
+            }
+        )
+    }
+
+    /// `deinitialize` runs without waiting for in-flight same-helper
+    /// tool-call handlers — those handlers' responses are dropped, which
+    /// is the documented contract. Backstop against a future change that
+    /// adds an in-flight barrier before deinit.
+    func testDeinitializeDoesNotWaitForInFlightToolCalls() async throws {
+        let helperId = "helper-A"
+        let toolStarted = expectation(description: "tool-call started")
+        let deinitObserved = expectation(description: "deinit handler ran")
+        let toolRelease = AsyncSignal()
+
+        let preQueued: [DispatchTestRequest] = [
+            DispatchTestRequest(helperId: helperId, messageId: "m-tool"),
+            DispatchTestRequest(helperId: helperId, messageId: "m-deinit", isDeinitialize: true)
+        ]
+
+        try await withDispatchHarness(
+            preQueuedRequests: preQueued,
+            handler: { request in
+                if request.isDeinitialize {
+                    deinitObserved.fulfill()
+                } else {
+                    toolStarted.fulfill()
+                    await toolRelease.wait()
+                }
+            },
+            body: { _, _ in
+                await fulfillment(of: [toolStarted, deinitObserved], timeout: 2.0)
+                await toolRelease.signal()
+            }
+        )
+    }
+
+    // MARK: - Shutdown log-noise tests
+
+    /// The documented shutdown sequence must not emit error-level logs.
+    /// Backstop against a regression in `ReadPipe.readLine()` /
+    /// `ResponseManager`'s `CancellationError` handling.
+    func testResponseManagerShutdownEmitsNoErrorLogs() async throws {
+        let recorder = LogRecorder()
+        let logger = Logger(label: "test.response-manager-shutdown") { _ in
+            RecordingLogHandler(recorder: recorder)
+        }
+
+        let helperPipe = try HelperResponsePipe(url: fifoURL, logger: logger)
+        let manager = ResponseManager<StubResponse>(responsePipe: helperPipe, logger: logger)
+        try await manager.startReading()
+
+        // Silent external writer — mirrors a peer staying open during teardown.
+        let externalWriter = try WritePipe(url: fifoURL)
+        try await externalWriter.open()
+
+        try await Task.sleep(for: .milliseconds(100))
+        await manager.stopReading()
+
+        let errors = recorder.eventsAtLevel(.error)
+        XCTAssertTrue(
+            errors.isEmpty,
+            "ResponseManager shutdown must not log at error level — got \(errors.count): \(errors.map(\.message).joined(separator: " | "))"
+        )
+
+        await externalWriter.close()
+    }
+
+    /// Symmetric to `testResponseManagerShutdownEmitsNoErrorLogs` but on
+    /// the request side — `HostRequestPipe.close()` must also be quiet.
+    func testHostRequestPipeShutdownEmitsNoErrorLogs() async throws {
+        let recorder = LogRecorder()
+        let logger = Logger(label: "test.host-request-shutdown") { _ in
+            RecordingLogHandler(recorder: recorder)
+        }
+
+        let readPipe = try ReadPipe(url: fifoURL)
+        let hostPipe = HostRequestPipe<StubRequest>(readPipe: readPipe, logger: logger)
+        try await hostPipe.open()
+
+        let externalWriter = try WritePipe(url: fifoURL)
+        try await externalWriter.open()
+
+        await hostPipe.startReading { (_: StubRequest) in }
+        try await Task.sleep(for: .milliseconds(100))
+        await hostPipe.close()
+
+        let errors = recorder.eventsAtLevel(.error)
+        XCTAssertTrue(
+            errors.isEmpty,
+            "HostRequestPipe shutdown must not log at error level — got \(errors.count): \(errors.map(\.message).joined(separator: " | "))"
+        )
+
+        await externalWriter.close()
+    }
+
+}
+
+/// Records labels with monotonic timestamps so cross-recorder ordering
+/// can be reconstructed after the fact.
+private actor AsyncOrderRecorder {
+    private var entries: [(label: String, at: ContinuousClock.Instant)] = []
+
+    func record(_ label: String) {
+        entries.append((label: label, at: ContinuousClock.now))
+    }
+
+    func firstIndex(of label: String) -> Int? {
+        entries.firstIndex(where: { $0.label == label })
+    }
+
+    func timestamp(at index: Int) -> ContinuousClock.Instant {
+        entries[index].at
+    }
+}
+
+/// One-shot async gate. `wait()` suspends until `signal()` is called.
+/// `signal()` is idempotent; subsequent calls are no-ops.
+private actor AsyncSignal {
+    private var continuations: [CheckedContinuation<Void, Never>] = []
+    private var fired = false
+
+    func wait() async {
+        if fired { return }
+        await withCheckedContinuation { continuation in
+            continuations.append(continuation)
+        }
+    }
+
+    func signal() {
+        guard !fired else { return }
+        fired = true
+        let pending = continuations
+        continuations.removeAll()
+        for continuation in pending {
+            continuation.resume()
+        }
+    }
+}
+
+/// Captures log events for assertions. Synchronous (NSLock-guarded) on
+/// purpose — an actor here would force `LogHandler.log` to spawn a Task,
+/// racing the assertion against capture.
+private final class LogRecorder: @unchecked Sendable {
+    struct CapturedEvent: Sendable {
+        let level: Logger.Level
+        let message: String
+    }
+
+    private let lock = NSLock()
+    private var events: [CapturedEvent] = []
+
+    func record(level: Logger.Level, message: String) {
+        lock.lock()
+        events.append(CapturedEvent(level: level, message: message))
+        lock.unlock()
+    }
+
+    func eventsAtLevel(_ level: Logger.Level) -> [CapturedEvent] {
+        lock.lock()
+        defer { lock.unlock() }
+        return events.filter { $0.level == level }
+    }
+}
+
+/// `LogHandler` that forwards every event to a `LogRecorder`. Logs at
+/// every level so the test decides what counts as noise.
+private struct RecordingLogHandler: LogHandler {
+    let recorder: LogRecorder
+    var metadata: Logger.Metadata = [:]
+    var logLevel: Logger.Level = .trace
+    var metadataProvider: Logger.MetadataProvider?
+
+    subscript(metadataKey key: String) -> Logger.Metadata.Value? {
+        get { metadata[key] }
+        set { metadata[key] = newValue }
+    }
+
+    func log(event: LogEvent) {
+        recorder.record(level: event.level, message: event.message.description)
     }
 }

@@ -71,6 +71,9 @@ public actor ResponseManager<Response: MCPResponseProtocol> {
                         }
                     }
                 }
+            } catch is CancellationError {
+                // Documented shutdown exit — see `ReadPipe.signalReaderWake()`.
+                logger?.info("RESPONSE_READER: Reader exited on cancellation")
             } catch {
                 logger?.error("RESPONSE_READER: Error in response reader: \(error)")
             }

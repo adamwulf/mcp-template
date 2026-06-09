@@ -48,9 +48,15 @@ public actor HostRequestPipe<Request: MCPRequestProtocol> {
 
     /// Start continuously reading requests from the pipe.
     ///
-    /// Each request is dispatched in its own Task so handlers run concurrently and the
-    /// read loop never blocks. Handler ordering is not guaranteed; MCP matches by
-    /// `messageId`.
+    /// Lifecycle requests (`isInitialize`, `isDeinitialize`) dispatch inline:
+    /// `EasyMCPHost.setupResponsePipe` must finish registering the response pipe
+    /// before any subsequent tool-call from the same helperId runs, and the
+    /// teardown on `deinitialize` must run immediately even if tool-call handlers
+    /// are still in flight (their responses fail to write and are dropped — a
+    /// helper that didn't want that shouldn't have sent `deinitialize` early).
+    ///
+    /// All other requests dispatch in their own Task so parallel tool calls from
+    /// one helper actually run in parallel; MCP matches by `messageId`.
     ///
     /// - Parameter requestHandler: Callback for handling received requests
     func startReading(requestHandler: @Sendable @escaping (Request) async -> Void) async {
@@ -63,9 +69,17 @@ public actor HostRequestPipe<Request: MCPRequestProtocol> {
             do {
                 while isReading && !Task.isCancelled {
                     if let request = try await readRequest() {
-                        Task { await requestHandler(request) }
+                        if request.isInitialize || request.isDeinitialize {
+                            await requestHandler(request)
+                        } else {
+                            Task { await requestHandler(request) }
+                        }
                     }
                 }
+            } catch is CancellationError {
+                // Documented shutdown exit — see `ReadPipe.signalReaderWake()`.
+                logger?.info("HOST_REQUEST_PIPE: Read loop exited on cancellation")
+                isReading = false
             } catch {
                 logger?.error("Error in read loop: \(error.localizedDescription)")
                 isReading = false
