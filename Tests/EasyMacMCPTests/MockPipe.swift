@@ -40,6 +40,9 @@ public actor MockPipeReader: PipeReadable {
     public func close() async {
         isClosed = true
     }
+
+    /// Mock implementation — no-op since the mock has no real FD to wake.
+    public func signalReaderWake() async {}
 }
 
 /// A mock implementation of PipeWritable for testing

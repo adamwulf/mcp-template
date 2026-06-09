@@ -81,6 +81,13 @@ public actor ReadPipe: PipeReadable {
     }
 
     deinit {
+        // No cancel/await/signal-wake dance here: deinit only runs when there
+        // are zero references to this actor, and any consumer Task parked in
+        // `readLine()` is keeping the consumer's actor (and therefore this
+        // ReadPipe) alive through `readPipe.readLine()`. By the time deinit
+        // can fire, every reader Task has already exited via the documented
+        // shutdown sequence. Do NOT try to add the sentinel-write pattern
+        // here — deinit is synchronous and cannot await dispatch_io to drain.
         if let fd = keepaliveWriterFD {
             Darwin.close(fd)
             keepaliveWriterFD = nil
@@ -191,7 +198,46 @@ public actor ReadPipe: PipeReadable {
         }
     }
 
-    /// Closes the pipe
+    /// Wake a consumer Task that is parked in `readLine()` so it can observe
+    /// cancellation. Writes a single newline byte through the keepalive writer
+    /// FD without closing anything else. The byte enters the FIFO buffer,
+    /// `AsyncBytes.Iterator` yields one stray empty line back to the consumer,
+    /// the consumer's read loop checks `Task.isCancelled` and exits.
+    ///
+    /// Why this is separate from `close()`: closing the reader FD while a
+    /// dispatch_io worker thread is parked on it deadlocks (see `close()`
+    /// docs). The correct shutdown is:
+    ///
+    /// 1. Consumer cancels its reader Task.
+    /// 2. Consumer calls `signalReaderWake()` to unblock the in-flight read.
+    /// 3. Consumer awaits its reader Task — the reader Task gets actual
+    ///    scheduler time on the cooperative pool to receive the iterator
+    ///    yield triggered by the sentinel byte and then exit on observed
+    ///    cancellation. Without this await, the actor that called close()
+    ///    races dispatch_io's channel teardown.
+    /// 4. Consumer calls `close()` — now uncontended, returns immediately.
+    ///
+    /// Sentinel write is best-effort: we discard the result of
+    /// `Darwin.write` because a closed-or-full keepalive FD must not block
+    /// teardown. The guard above already returns early if `open()` was
+    /// never called or `close()` already ran.
+    public func signalReaderWake() {
+        guard let fd = keepaliveWriterFD else { return }
+        var sentinel: UInt8 = 0x0A // '\n'
+        _ = Darwin.write(fd, &sentinel, 1)
+    }
+
+    /// Closes the pipe.
+    ///
+    /// **Important**: if a consumer Task is currently parked in `readLine()`,
+    /// the caller MUST have already cancelled and awaited that Task (with a
+    /// `signalReaderWake()` between the cancel and the await) before calling
+    /// `close()`. Otherwise the underlying `fileHandle.close()` will deadlock
+    /// against `dispatch_io`'s in-flight read on the FD — `close(2)` on
+    /// Darwin does not deliver EBADF/EINTR to the dispatch worker, and with
+    /// an external writer still attached the FIFO never sees EOF.
+    ///
+    /// See `signalReaderWake()` for the documented shutdown sequence.
     public func close() async {
         lineIterator = nil
         if let fd = keepaliveWriterFD {

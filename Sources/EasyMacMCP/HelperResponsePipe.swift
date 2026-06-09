@@ -27,10 +27,19 @@ public actor HelperResponsePipe {
         try await readPipe.open()
     }
 
-    /// Close the pipe
+    /// Close the pipe. Stops any in-flight reading Task first so the
+    /// underlying ReadPipe can tear down without racing against dispatch_io
+    /// — see `ReadPipe.signalReaderWake()` for the rationale.
     public func close() async {
-        stopReading()
+        await stopReading()
         await readPipe.close()
+    }
+
+    /// Wake any in-flight `readLine()` so a cancelled consumer Task can
+    /// exit. Pass-through to the underlying ReadPipe. See
+    /// `ReadPipe.signalReaderWake()` for details.
+    public func signalReaderWake() async {
+        await readPipe.signalReaderWake()
     }
 
     /// Start continuously reading responses from the pipe
@@ -59,11 +68,18 @@ public actor HelperResponsePipe {
         }
     }
 
-    /// Stop reading responses
-    public func stopReading() {
+    /// Stop reading responses. Cancels the reader Task, wakes any in-flight
+    /// `readLine()` via the underlying ReadPipe's keepalive sentinel, then
+    /// awaits the Task to exit. This sequence is required to avoid
+    /// deadlocking the subsequent `readPipe.close()` against dispatch_io
+    /// (see `ReadPipe.signalReaderWake()`).
+    public func stopReading() async {
         isReading = false
-        readingTask?.cancel()
+        let task = readingTask
         readingTask = nil
+        task?.cancel()
+        await readPipe.signalReaderWake()
+        _ = await task?.value
     }
 
     /// Read a single response from the pipe

@@ -77,12 +77,22 @@ public actor ResponseManager<Response: MCPResponseProtocol> {
         }
     }
 
-    /// Stop reading from the response pipe
+    /// Stop reading from the response pipe.
+    ///
+    /// Cancels the reader Task, wakes any in-flight `readLine()` via the
+    /// response pipe's keepalive sentinel, awaits the Task to exit, then
+    /// closes the pipe. This ordering is required to avoid deadlocking
+    /// `responsePipe.close()` against `dispatch_io` (see
+    /// `ReadPipe.signalReaderWake()` for the underlying rationale and the
+    /// original CLI-hang report that motivated this fix).
     public func stopReading() async {
-        responseReaderTask?.cancel()
+        let task = responseReaderTask
         responseReaderTask = nil
+        task?.cancel()
+        await responsePipe.signalReaderWake()
+        _ = await task?.value
 
-        // Close the pipe
+        // Close the pipe — uncontended now that the reader Task has exited.
         await responsePipe.close()
         logger?.info("Response pipe closed, stopped reading responses")
     }

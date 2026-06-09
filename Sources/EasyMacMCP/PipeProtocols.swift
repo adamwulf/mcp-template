@@ -10,6 +10,12 @@ public protocol PipeReadable: Sendable {
     /// - Throws: Error if reading fails
     func readLine() async throws -> String?
 
+    /// Wakes any in-flight `readLine()` so a cancelled consumer Task can
+    /// exit. Called by consumers between cancelling their reader Task and
+    /// awaiting its completion, before `close()`. See `ReadPipe` for
+    /// details on why this is needed (dispatch_io vs `close(2)` race).
+    func signalReaderWake() async
+
     /// Closes the pipe
     func close() async
 }

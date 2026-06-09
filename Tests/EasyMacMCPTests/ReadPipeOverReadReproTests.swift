@@ -1,6 +1,47 @@
 import XCTest
 import Foundation
+import MCP
 @testable import EasyMacMCP
+
+/// Minimal `MCPResponseProtocol` conformance for tests that exercise the
+/// `HelperResponsePipe.startReading(...)` generic API. The reader Task
+/// will never actually decode a real response in these tests — the pipe
+/// stays silent except for the sentinel byte `signalReaderWake()` injects
+/// during shutdown.
+private struct StubResponse: MCPResponseProtocol {
+    let helperId: String
+    let messageId: String
+
+    func asCallToolResult() -> MCP.CallTool.Result {
+        MCP.CallTool.Result(content: [], isError: false)
+    }
+
+    static func makeListToolsResponse(helperId: String, messageId: String, tools: [ToolMetadata]) -> StubResponse {
+        StubResponse(helperId: helperId, messageId: messageId)
+    }
+
+    func asListToolsResult() -> MCP.ListTools.Result? { nil }
+}
+
+/// Minimal `MCPRequestProtocol` conformance for tests that exercise the
+/// `HostRequestPipe.startReading(...)` generic API. The reader Task will
+/// never actually decode a real request — the pipe stays silent except
+/// for the sentinel byte that `signalReaderWake()` injects during
+/// shutdown.
+private struct StubRequest: MCPRequestProtocol {
+    let helperId: String
+    let messageId: String
+    var isInitialize: Bool { false }
+    var isDeinitialize: Bool { false }
+
+    static func create(helperId: String, messageId: String, parameters: MCP.CallTool.Parameters) throws -> StubRequest {
+        StubRequest(helperId: helperId, messageId: messageId)
+    }
+
+    static func makeListToolsRequest(helperId: String, messageId: String) -> StubRequest {
+        StubRequest(helperId: helperId, messageId: messageId)
+    }
+}
 
 /// Standalone repro for the suspected `ReadPipe.readLine()` over-read bug.
 ///
@@ -236,6 +277,376 @@ final class ReadPipeOverReadReproTests: XCTestCase {
         let writer2 = try await writerTask.value
         await writer2.close()
         await reader.close()
+    }
+
+    /// Close while a reader is mid-`read()` and an *external* writer is
+    /// still attached — the production deadlock case, now fixed by the
+    /// cancel → `signalReaderWake()` → await → `close()` shutdown sequence.
+    ///
+    /// The CLI hang from the field looked like this: the helper process has a
+    /// ReadPipe open on the response FIFO; the host app has its own
+    /// WritePipe open on the same FIFO (the writer side of the response
+    /// channel). When the CLI tears down, it calls `ReadPipe.close()` while
+    /// the reader Task is parked in `read(2)`.
+    ///
+    /// Root cause: `FileHandle.AsyncBytes` is backed by `dispatch_io`, which
+    /// owns the FD for the lifetime of its read. Calling `fileHandle.close()`
+    /// from another thread while a dispatch_io worker is parked on a kqueue
+    /// `EVFILT_READ` filter does NOT deliver EBADF/EINTR to the worker; the
+    /// closer blocks waiting for dispatch_io to release the FD. With an
+    /// external writer attached, the FIFO never sees EOF, so the kqueue
+    /// filter never fires and dispatch_io never releases. Deadlock.
+    ///
+    /// The fix: consumers MUST cancel and await their reader Task before
+    /// calling `close()`. The required sequence is:
+    ///
+    ///   1. cancel the reader Task
+    ///   2. `signalReaderWake()` to deliver a sentinel byte through the
+    ///      keepalive — wakes the dispatch_io read so the iterator can yield
+    ///   3. `await readerTask.value` — gives dispatch_io scheduler time to
+    ///      drain (this is the key step — back-to-back write+close on the
+    ///      same actor leaves no time for dispatch_io to run)
+    ///   4. `close()` — uncontended, returns immediately
+    ///
+    /// This test pins down the contract.
+    func testProperShutdownSequenceUnblocksCleanlyWithExternalWriterAttached() async throws {
+        let reader = try ReadPipe(url: fifoURL)
+        try await reader.open()
+
+        // External writer attached, but produces no data. This mirrors the
+        // host-side WritePipe staying open during CLI teardown.
+        let externalWriter = try WritePipe(url: fifoURL)
+        try await externalWriter.open()
+
+        // Start a reader Task that will park in read(). With an external
+        // writer attached, EOF is impossible — the only way out is the
+        // sentinel byte we deliver in step 2 below.
+        let readerTask = Task<String?, Never> {
+            return try? await reader.readLine()
+        }
+
+        // Give the reader Task a moment to actually reach the read() syscall.
+        try await Task.sleep(for: .milliseconds(100))
+
+        // Race the full shutdown sequence against a deadline. With the fix,
+        // the whole sequence completes in well under a second. Without it,
+        // the close() at the end would block until either the reader Task is
+        // woken or the dispatch_io grace timer fires; the test's rescue
+        // write through the external writer rescues that case so a
+        // regression doesn't hang the suite.
+        let shutdownStartedAt = ContinuousClock.now
+        let elapsedOnComplete: ContinuousClock.Duration = await withTaskGroup(of: ContinuousClock.Duration?.self) { group in
+            group.addTask {
+                // The contract — cancel → wake → await → close.
+                readerTask.cancel()
+                await reader.signalReaderWake()
+                _ = await readerTask.value
+                await reader.close()
+                return ContinuousClock.now - shutdownStartedAt
+            }
+            group.addTask {
+                // Deadline: 2s. If shutdown hasn't completed by then, rescue
+                // by writing data through the external writer so any blocked
+                // read returns and the suite doesn't hang. On the happy path
+                // we cancel this task before it ever runs the write.
+                do {
+                    try await Task.sleep(for: .seconds(2))
+                } catch {
+                    return nil
+                }
+                try? await externalWriter.write("rescue\n")
+                return nil
+            }
+            var result: ContinuousClock.Duration = .seconds(0)
+            for await item in group {
+                if let item = item {
+                    result = item
+                    break
+                }
+            }
+            group.cancelAll()
+            await group.waitForAll()
+            return result
+        }
+
+        XCTAssertLessThan(elapsedOnComplete, .seconds(1), "The full cancel → signalReaderWake → await → close shutdown sequence should complete in well under a second with an external writer attached. Taking >=1s here means the new shutdown contract isn't unblocking the dispatch_io reader — likely a regression in `signalReaderWake()`, the reader Task await, or `close()`'s post-await invariants.")
+
+        await externalWriter.close()
+    }
+
+    /// Close with no external writer attached at all.
+    ///
+    /// Realistic scenario: the helper opens its response pipe before the
+    /// host app has wired up its writer (or the host has already detached
+    /// and quit), then the helper shuts down. The only writer on the FIFO
+    /// is ReadPipe's own keepalive FD.
+    ///
+    /// Without an external writer, the sentinel write in close() could
+    /// theoretically SIGPIPE if our keepalive FD were the only writer AND
+    /// it were somehow torn down before the write — this test guards
+    /// against a regression where the keepalive close-order or signal
+    /// disposition gets disturbed. With the current fix, the write goes
+    /// out, the keepalive is the sole reader-of-its-own-write (nobody
+    /// drains), then the FD is closed and torn down cleanly.
+    func testCloseWithNoExternalWriterAttached() async throws {
+        let reader = try ReadPipe(url: fifoURL)
+        try await reader.open()
+
+        // No external writer at all. close() should return promptly.
+        let closeStartedAt = ContinuousClock.now
+        await reader.close()
+        let elapsed = ContinuousClock.now - closeStartedAt
+
+        XCTAssertLessThan(elapsed, .seconds(1), "close() should return in well under a second with no external writer attached")
+    }
+
+    /// Concurrent close() calls from two Tasks.
+    ///
+    /// Realistic scenario: the helper has two shutdown paths that both end
+    /// up calling close() on the same pipe — e.g. an explicit cleanup
+    /// closure in sendRequest() and a defer/finalizer somewhere else. Actor
+    /// reentrancy serializes them, but the second call must not crash
+    /// (double-close on the FD), SIGPIPE, or hang.
+    ///
+    /// Both calls should complete quickly; the second is a no-op since
+    /// keepaliveWriterFD and fileHandle are both nil by then.
+    func testConcurrentCloseCalls() async throws {
+        let reader = try ReadPipe(url: fifoURL)
+        try await reader.open()
+
+        let closeStartedAt = ContinuousClock.now
+        async let close1: Void = reader.close()
+        async let close2: Void = reader.close()
+        _ = await (close1, close2)
+        let elapsed = ContinuousClock.now - closeStartedAt
+
+        XCTAssertLessThan(elapsed, .seconds(1), "two concurrent close() calls should both return promptly; >=1s suggests a hang or busy-loop")
+
+        // A third close() after both have returned should still be a clean
+        // no-op. Catches a regression where state isn't properly nil-ed.
+        await reader.close()
+    }
+
+    /// signalReaderWake() on a pipe that was never opened.
+    ///
+    /// Realistic scenario: a helper constructs a ReadPipe, then errors out
+    /// during initialization before calling `open()`. The cleanup path
+    /// still calls `signalReaderWake()` (e.g. as part of a generic
+    /// teardown sequence). This must be a clean no-op — no crash, no
+    /// SIGPIPE, no write to an invalid FD.
+    func testSignalReaderWakeOnNeverOpenedPipe() async throws {
+        let reader = try ReadPipe(url: fifoURL)
+        // Do NOT call open(). keepaliveWriterFD is nil.
+        await reader.signalReaderWake()
+        // If we got here without crashing, the no-op guard works.
+    }
+
+    /// signalReaderWake() after close() is also a no-op.
+    ///
+    /// Realistic scenario: a cleanup path calls close() and then a stray
+    /// shutdown signal (or a defer block) calls signalReaderWake() again.
+    /// The keepalive FD is already nil, so the call returns instantly
+    /// without touching any FD.
+    func testSignalReaderWakeAfterClose() async throws {
+        let reader = try ReadPipe(url: fifoURL)
+        try await reader.open()
+        await reader.close()
+        // After close, keepaliveWriterFD is nil — this must no-op.
+        await reader.signalReaderWake()
+    }
+
+    /// Double stopReading() on HelperResponsePipe.
+    ///
+    /// Realistic scenario: a consumer calls stopReading() explicitly, and
+    /// a separate cleanup path (e.g. close(), or a defer block in an
+    /// error handler) also calls stopReading() / close(). The second call
+    /// must be a clean no-op — the readingTask reference was nil-ed by
+    /// the first call, so cancel/await is skipped; signalReaderWake will
+    /// still run but writes a sentinel into a closed pipe is harmless
+    /// (or into an open one is one stray empty line, which the decode
+    /// loop logs and discards). No crash, no hang.
+    func testDoubleStopReadingIsSafe() async throws {
+        let helperPipe = try HelperResponsePipe(url: fifoURL)
+        try await helperPipe.open()
+
+        await helperPipe.startReading { (_: StubResponse) in }
+        try await Task.sleep(for: .milliseconds(50))
+
+        // First stopReading drives the full sequence.
+        await helperPipe.stopReading()
+        // Second stopReading must be safe.
+        await helperPipe.stopReading()
+
+        await helperPipe.close()
+    }
+
+    /// HelperResponsePipe.close() while its internal reader Task is parked
+    /// in readLine() — the production code path.
+    ///
+    /// `HelperResponsePipe.startReading(...)` owns an internal Task that
+    /// loops on `readPipe.readLine()` and dispatches decoded responses to a
+    /// handler. This is how ResponseManager consumes responses in production
+    /// (see ResponseManager.swift:52-78). When the helper shuts down,
+    /// `close()` must cancel that internal Task, signal the reader to wake,
+    /// await the Task's exit, and then close the underlying ReadPipe.
+    ///
+    /// Test setup mirrors production: start reading via `startReading(...)`,
+    /// attach an external writer that never produces data (stands in for the
+    /// host-side writer staying open during shutdown), then call close().
+    /// Expect prompt return.
+    func testHelperResponsePipeCloseUnblocksInternalReaderTask() async throws {
+        let helperPipe = try HelperResponsePipe(url: fifoURL)
+        try await helperPipe.open()
+
+        let externalWriter = try WritePipe(url: fifoURL)
+        try await externalWriter.open()
+
+        // Start the internal reader loop. The handler closure type matches
+        // the generic constraint on `startReading`.
+        await helperPipe.startReading { (_: StubResponse) in }
+
+        // Give the internal Task a moment to actually reach the read() syscall.
+        try await Task.sleep(for: .milliseconds(100))
+
+        let closeStartedAt = ContinuousClock.now
+        let elapsedOnComplete: ContinuousClock.Duration = await withTaskGroup(of: ContinuousClock.Duration?.self) { group in
+            group.addTask {
+                await helperPipe.close()
+                return ContinuousClock.now - closeStartedAt
+            }
+            group.addTask {
+                do {
+                    try await Task.sleep(for: .seconds(2))
+                } catch {
+                    return nil
+                }
+                try? await externalWriter.write("rescue\n")
+                return nil
+            }
+            var result: ContinuousClock.Duration = .seconds(0)
+            for await item in group {
+                if let item = item {
+                    result = item
+                    break
+                }
+            }
+            group.cancelAll()
+            await group.waitForAll()
+            return result
+        }
+
+        XCTAssertLessThan(elapsedOnComplete, .seconds(1), "HelperResponsePipe.close() should return promptly while its internal reader Task is parked in readLine() with an external writer attached; >=1s means the cancel → signalReaderWake → await sequence inside close()/stopReading() isn't unblocking the dispatch_io reader")
+
+        await externalWriter.close()
+    }
+
+    /// ResponseManager.stopReading() while its internal reader Task is
+    /// parked in readLine() — the exact production code path from the
+    /// original CLI-hang thread dump.
+    ///
+    /// ResponseManager wraps HelperResponsePipe, owns its own reader Task
+    /// (`responseReaderTask`), and calls `responsePipe.readLine()` in a
+    /// loop. When the helper shuts down (the thread dump's
+    /// `ResponseManager.stopReading()` frame), the manager must cancel
+    /// the reader Task, signal the wake, await the Task to exit, and
+    /// then close the pipe. This test pins down the production sequence
+    /// end-to-end.
+    func testResponseManagerStopReadingUnblocksWithExternalWriterAttached() async throws {
+        let helperPipe = try HelperResponsePipe(url: fifoURL)
+        let manager = ResponseManager<StubResponse>(responsePipe: helperPipe)
+        try await manager.startReading()
+
+        // External writer attached, but produces no data — mirrors the
+        // host-side WritePipe staying open during CLI teardown.
+        let externalWriter = try WritePipe(url: fifoURL)
+        try await externalWriter.open()
+
+        // Give the manager's internal Task a moment to park in read().
+        try await Task.sleep(for: .milliseconds(100))
+
+        let stopStartedAt = ContinuousClock.now
+        let elapsedOnComplete: ContinuousClock.Duration = await withTaskGroup(of: ContinuousClock.Duration?.self) { group in
+            group.addTask {
+                await manager.stopReading()
+                return ContinuousClock.now - stopStartedAt
+            }
+            group.addTask {
+                do {
+                    try await Task.sleep(for: .seconds(2))
+                } catch {
+                    return nil
+                }
+                try? await externalWriter.write("rescue\n")
+                return nil
+            }
+            var result: ContinuousClock.Duration = .seconds(0)
+            for await item in group {
+                if let item = item {
+                    result = item
+                    break
+                }
+            }
+            group.cancelAll()
+            await group.waitForAll()
+            return result
+        }
+
+        XCTAssertLessThan(elapsedOnComplete, .seconds(1), "ResponseManager.stopReading() should return promptly while its internal reader Task is parked in readLine() with an external writer attached. This is the exact CLI-hang path from the original report; >=1s means a regression in the shutdown sequence.")
+
+        await externalWriter.close()
+    }
+
+    /// HostRequestPipe.close() while its internal reader Task is parked
+    /// in readLine() — symmetric to the HelperResponsePipe case but on
+    /// the request side. The host app uses HostRequestPipe to receive
+    /// incoming requests from helpers; same shutdown contract applies.
+    func testHostRequestPipeCloseUnblocksInternalReaderTask() async throws {
+        let readPipe = try ReadPipe(url: fifoURL)
+        let hostPipe = HostRequestPipe<StubRequest>(readPipe: readPipe)
+        try await hostPipe.open()
+
+        let externalWriter = try WritePipe(url: fifoURL)
+        try await externalWriter.open()
+
+        // Start the internal reader loop with a no-op handler.
+        await hostPipe.startReading { (_: StubRequest) in }
+        try await Task.sleep(for: .milliseconds(100))
+
+        let closeStartedAt = ContinuousClock.now
+        let elapsedOnComplete: ContinuousClock.Duration = await withTaskGroup(of: ContinuousClock.Duration?.self) { group in
+            group.addTask {
+                await hostPipe.close()
+                return ContinuousClock.now - closeStartedAt
+            }
+            group.addTask {
+                do {
+                    try await Task.sleep(for: .seconds(2))
+                } catch {
+                    return nil
+                }
+                try? await externalWriter.write("rescue\n")
+                return nil
+            }
+            var result: ContinuousClock.Duration = .seconds(0)
+            for await item in group {
+                if let item = item {
+                    result = item
+                    break
+                }
+            }
+            group.cancelAll()
+            await group.waitForAll()
+            return result
+        }
+
+        XCTAssertLessThan(elapsedOnComplete, .seconds(1), "HostRequestPipe.close() should return promptly while its internal reader Task is parked in readLine() with an external writer attached; >=1s means the request-side shutdown sequence has drifted from the response-side one.")
+
+        await externalWriter.close()
+    }
+
+    private enum CloseOutcome {
+        case closed
+        case deadlineFired
     }
 
     // MARK: - Helpers
