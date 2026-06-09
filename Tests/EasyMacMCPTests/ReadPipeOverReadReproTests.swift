@@ -407,6 +407,59 @@ final class ReadPipeOverReadReproTests: XCTestCase {
         await reader.close()
     }
 
+    /// signalReaderWake() on a pipe that was never opened.
+    ///
+    /// Realistic scenario: a helper constructs a ReadPipe, then errors out
+    /// during initialization before calling `open()`. The cleanup path
+    /// still calls `signalReaderWake()` (e.g. as part of a generic
+    /// teardown sequence). This must be a clean no-op — no crash, no
+    /// SIGPIPE, no write to an invalid FD.
+    func testSignalReaderWakeOnNeverOpenedPipe() async throws {
+        let reader = try ReadPipe(url: fifoURL)
+        // Do NOT call open(). keepaliveWriterFD is nil.
+        await reader.signalReaderWake()
+        // If we got here without crashing, the no-op guard works.
+    }
+
+    /// signalReaderWake() after close() is also a no-op.
+    ///
+    /// Realistic scenario: a cleanup path calls close() and then a stray
+    /// shutdown signal (or a defer block) calls signalReaderWake() again.
+    /// The keepalive FD is already nil, so the call returns instantly
+    /// without touching any FD.
+    func testSignalReaderWakeAfterClose() async throws {
+        let reader = try ReadPipe(url: fifoURL)
+        try await reader.open()
+        await reader.close()
+        // After close, keepaliveWriterFD is nil — this must no-op.
+        await reader.signalReaderWake()
+    }
+
+    /// Double stopReading() on HelperResponsePipe.
+    ///
+    /// Realistic scenario: a consumer calls stopReading() explicitly, and
+    /// a separate cleanup path (e.g. close(), or a defer block in an
+    /// error handler) also calls stopReading() / close(). The second call
+    /// must be a clean no-op — the readingTask reference was nil-ed by
+    /// the first call, so cancel/await is skipped; signalReaderWake will
+    /// still run but writes a sentinel into a closed pipe is harmless
+    /// (or into an open one is one stray empty line, which the decode
+    /// loop logs and discards). No crash, no hang.
+    func testDoubleStopReadingIsSafe() async throws {
+        let helperPipe = try HelperResponsePipe(url: fifoURL)
+        try await helperPipe.open()
+
+        await helperPipe.startReading { (_: StubResponse) in }
+        try await Task.sleep(for: .milliseconds(50))
+
+        // First stopReading drives the full sequence.
+        await helperPipe.stopReading()
+        // Second stopReading must be safe.
+        await helperPipe.stopReading()
+
+        await helperPipe.close()
+    }
+
     /// HelperResponsePipe.close() while its internal reader Task is parked
     /// in readLine() — the production code path.
     ///

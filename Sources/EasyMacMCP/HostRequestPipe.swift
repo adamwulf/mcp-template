@@ -37,6 +37,10 @@ public actor HostRequestPipe<Request: MCPRequestProtocol> {
     /// Close the pipe. Stops any in-flight reading Task first so the
     /// underlying ReadPipe can tear down without racing against dispatch_io
     /// — see `ReadPipe.signalReaderWake()` for the rationale.
+    ///
+    /// No `signalReaderWake()` passthrough is exposed here (unlike
+    /// `HelperResponsePipe`) because nothing outside this type owns the
+    /// reader Task — `close()` orchestrates the full sequence internally.
     func close() async {
         await stopReading()
         await readPipe.close()
