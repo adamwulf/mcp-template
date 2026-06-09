@@ -191,37 +191,46 @@ public actor ReadPipe: PipeReadable {
         }
     }
 
+    /// Wake a consumer Task that is parked in `readLine()` so it can observe
+    /// cancellation. Writes a single newline byte through the keepalive writer
+    /// FD without closing anything else. The byte enters the FIFO buffer,
+    /// `AsyncBytes.Iterator` yields one stray empty line back to the consumer,
+    /// the consumer's read loop checks `Task.isCancelled` and exits.
+    ///
+    /// Why this is separate from `close()`: closing the reader FD while a
+    /// dispatch_io worker thread is parked on it deadlocks (see `close()`
+    /// docs). The correct shutdown is:
+    ///
+    /// 1. Consumer cancels its reader Task.
+    /// 2. Consumer calls `signalReaderWake()` to unblock the in-flight read.
+    /// 3. Consumer awaits its reader Task — this gives the dispatch_io
+    ///    worker thread real scheduler time to dequeue the kevent, deliver
+    ///    the byte to the AsyncBytes iterator, and release the FD.
+    /// 4. Consumer calls `close()` — now uncontended, returns immediately.
+    ///
+    /// The sentinel write is best-effort (`Darwin.write` ignores short
+    /// writes/errors): if the keepalive FD is already gone we still want
+    /// teardown to proceed.
+    public func signalReaderWake() {
+        guard let fd = keepaliveWriterFD else { return }
+        var sentinel: UInt8 = 0x0A // '\n'
+        _ = Darwin.write(fd, &sentinel, 1)
+    }
+
     /// Closes the pipe.
     ///
-    /// If a consumer Task is currently parked in `readLine()` (i.e. blocked
-    /// inside `read(2)` via `AsyncBytes.Iterator`), we cannot just close the
-    /// reader FD — `close(2)` on a FD that another thread is mid-`read(2)`
-    /// on does NOT return EBADF/EINTR to the reader on macOS, and the closer
-    /// waits for the read to release the FD. With an external writer still
-    /// attached to the FIFO, the kernel writer count stays positive so the
-    /// read never sees EOF either, and the two sides deadlock.
+    /// **Important**: if a consumer Task is currently parked in `readLine()`,
+    /// the caller MUST have already cancelled and awaited that Task (with a
+    /// `signalReaderWake()` between the cancel and the await) before calling
+    /// `close()`. Otherwise the underlying `fileHandle.close()` will deadlock
+    /// against `dispatch_io`'s in-flight read on the FD — `close(2)` on
+    /// Darwin does not deliver EBADF/EINTR to the dispatch worker, and with
+    /// an external writer still attached the FIFO never sees EOF.
     ///
-    /// To break this safely, we write a single sentinel byte through our own
-    /// keepalive writer FD before tearing anything down. The blocked
-    /// `read(2)` returns with that byte, `AsyncBytes.Iterator` yields back to
-    /// the consumer, and once it suspends again on a fresh `next()` call we
-    /// can drop the FileHandle without contention. Consumers (e.g.
-    /// `HelperResponsePipe`, `HostRequestPipe`) cancel their reader Task
-    /// before calling `close()`, so the sentinel byte typically arrives, the
-    /// iterator yields one stray byte/line, the loop sees `Task.isCancelled`,
-    /// and the reader exits cleanly. The sentinel write is best-effort: if
-    /// it fails (keepalive FD already gone, pipe full, etc.) we still
-    /// proceed with teardown — the consumer is responsible for handling a
-    /// stray decode-failed line in that window.
+    /// See `signalReaderWake()` for the documented shutdown sequence.
     public func close() async {
         lineIterator = nil
         if let fd = keepaliveWriterFD {
-            // Sentinel newline: keeps it parseable as an "empty line" by any
-            // AsyncLineSequence consumer rather than corrupting a real
-            // pending line. Best-effort — ignore short writes / errors;
-            // teardown proceeds either way.
-            var sentinel: UInt8 = 0x0A // '\n'
-            _ = Darwin.write(fd, &sentinel, 1)
             Darwin.close(fd)
             keepaliveWriterFD = nil
         }
