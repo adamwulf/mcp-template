@@ -125,31 +125,12 @@ public actor WritePipe: PipeWritable {
 
     /// Writes data to the pipe.
     ///
-    /// Two layers of atomicity matter when multiple writers share one FIFO
-    /// (the central request pipe is the canonical example — every helper
-    /// process has its own `WritePipe`/`HelperRequestPipe` writing into a
-    /// single FIFO that the host reads from):
-    ///
-    /// 1. **Per-actor serialization (intra-helper).** `WritePipe` is an
-    ///    actor, so calls to `write(_:)` on the same instance serialize.
-    ///    A helper that issues two `sendRequest(...)` calls back-to-back
-    ///    will see them complete in order, never interleaved.
-    ///
-    /// 2. **`PIPE_BUF` kernel atomicity (inter-helper).** Different
-    ///    helpers hold their own `WritePipe` instances and bypass each
-    ///    others' actor lock entirely. Atomicity across helpers therefore
-    ///    depends on the POSIX guarantee that writes of at most
-    ///    `PIPE_BUF` bytes to a FIFO are atomic — the kernel will not
-    ///    interleave them with another writer's bytes. `PIPE_BUF` is
-    ///    `512` per POSIX and `65536` on Darwin/Linux in practice, which
-    ///    comfortably accommodates JSON request lines for typical MCP
-    ///    tool calls. Requests whose serialized JSON exceeds `PIPE_BUF`
-    ///    could interleave with another helper's request at the kernel
-    ///    level; this is not defended against here. If a future tool
-    ///    accepts very large embedded payloads (large base64 blobs,
-    ///    multi-megabyte text), a per-helper outer FIFO with a host-side
-    ///    multiplexer, or framing with explicit length prefixes, would
-    ///    be required.
+    /// When multiple `WritePipe` instances share one FIFO (e.g. each helper
+    /// process writes to the central request pipe), cross-writer atomicity
+    /// relies on POSIX `PIPE_BUF` — writes ≤ `PIPE_BUF` bytes never interleave
+    /// at the kernel level. `PIPE_BUF` is 65536 on Darwin/Linux, which
+    /// accommodates typical JSON request lines. Larger payloads can interleave
+    /// and would need explicit framing (length prefix, per-helper FIFO).
     ///
     /// - Parameter data: The data to write
     /// - Throws: WritePipeError if writing fails

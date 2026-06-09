@@ -44,11 +44,9 @@ private struct StubRequest: MCPRequestProtocol {
     }
 }
 
-/// MCPRequestProtocol conformance used by the dispatch-ordering tests. Unlike
-/// `StubRequest`, this struct's `isInitialize`/`isDeinitialize` flags are
-/// stored properties so a test can construct a mix of lifecycle and
-/// non-lifecycle requests, write them to the FIFO as JSON, and let
-/// `HostRequestPipe.readRequest()` decode them back on the host side.
+/// Variant of `StubRequest` with mutable `isInitialize`/`isDeinitialize`
+/// flags so the dispatch tests can encode a mix of lifecycle and
+/// non-lifecycle requests as JSON and let `HostRequestPipe` decode them.
 private struct DispatchTestRequest: MCPRequestProtocol, Codable {
     let helperId: String
     let messageId: String
@@ -740,33 +738,9 @@ final class ReadPipeOverReadReproTests: XCTestCase {
     }
 
     // MARK: - Dispatch ordering tests
-    //
-    // These tests pin down the per-request dispatch invariants in
-    // `HostRequestPipe.startReading(...)`:
-    //
-    //  - `initialize` is dispatched inline (read loop blocks until handler
-    //    returns), so any subsequent same-helper request observes the host
-    //    state that `initialize` set up (e.g. the response pipe being
-    //    opened and registered).
-    //  - `deinitialize` is dispatched inline (read loop blocks until handler
-    //    returns), so the response pipe teardown runs immediately even if
-    //    the helper had in-flight tool-call handlers. Those in-flight
-    //    handlers may fail to write back — that's the documented contract:
-    //    a helper that wanted those responses shouldn't have sent
-    //    deinitialize early.
-    //  - Non-lifecycle requests are dispatched in their own Task, so
-    //    handlers run concurrently with the read loop and with each
-    //    other. This preserves the parallel-tool-call workload that
-    //    commit 4c00a64 was originally optimizing for.
-    //
-    // The tests below exercise each of these invariants in isolation.
 
-    /// Helper to drive a sequence of pre-written JSON request lines through
-    /// `HostRequestPipe` and observe the dispatcher's behavior via a handler
-    /// closure. The pipe is opened, a writer is attached, the requests are
-    /// pre-queued in the FIFO before `startReading()` is called, then the
-    /// reader starts and the supplied `body` runs the assertions. Always
-    /// tears everything down on exit.
+    /// Pre-queues `preQueuedRequests` as JSON lines in the FIFO, then starts
+    /// the reader with `handler` and runs `body`. Always tears down on exit.
     private func withDispatchHarness(
         preQueuedRequests: [DispatchTestRequest],
         handler: @escaping @Sendable (DispatchTestRequest) async -> Void,
@@ -799,14 +773,10 @@ final class ReadPipeOverReadReproTests: XCTestCase {
         await writer.close()
     }
 
-    /// An `initialize` request followed immediately by a tool-call request
-    /// for the same helperId must be dispatched in order — the tool-call
-    /// handler must not start until the `initialize` handler has fully
-    /// returned. This is the production invariant that broke with commit
-    /// 4c00a64 (when both requests were Task-dispatched, the tool-call's
-    /// Task could run before the initialize's Task finished opening the
-    /// response pipe, the tool-call handler then found no pipe registered,
-    /// returned silently, and the helper timed out).
+    /// Initialize must fully complete before a same-helperId tool-call is
+    /// dispatched. Commit 4c00a64 broke this by Task-dispatching every
+    /// request, letting the tool-call run before `setupResponsePipe`
+    /// finished — the helper then timed out with no response.
     func testInitializeBlocksSubsequentSameHelperRequest() async throws {
         let helperId = "helper-A"
         let initializeStarted = AsyncOrderRecorder()
@@ -825,10 +795,7 @@ final class ReadPipeOverReadReproTests: XCTestCase {
             handler: { request in
                 if request.isInitialize {
                     await initializeStarted.record("init-start")
-                    // Simulate the host doing pipe setup work — equivalent to
-                    // `setupResponsePipe(for:)` opening a FIFO. The whole
-                    // point of the inline-dispatch invariant is that the
-                    // tool-call handler must wait for this to finish.
+                    // Stands in for `setupResponsePipe(for:)` doing real work.
                     try? await Task.sleep(for: .milliseconds(150))
                     await initializeFinished.record("init-end")
                 } else {
@@ -850,20 +817,15 @@ final class ReadPipeOverReadReproTests: XCTestCase {
         XCTAssertNotNil(toolStartIdx, "tool-call handler should have run")
 
         if let initEnd = initEndIdx, let toolStart = toolStartIdx {
-            // We measured init-end and tool-start on separate AsyncOrderRecorders
-            // (so their indices aren't directly comparable). Instead, re-derive
-            // the ordering via the absolute timestamps each recorder stamped.
+            // Indices come from separate recorders; compare via absolute timestamps.
             let initEndAt = await initializeFinished.timestamp(at: initEnd)
             let toolStartAt = await toolCallStarted.timestamp(at: toolStart)
             XCTAssertLessThan(initEndAt, toolStartAt, "tool-call handler started before initialize handler finished — the read loop did not wait for initialize to complete before dispatching the next request, which means EasyMCPHost.setupResponsePipe could race against the first real tool call.")
         }
     }
 
-    /// Two non-lifecycle (tool-call) requests from the same helper must run
-    /// concurrently — the second must be able to start while the first is
-    /// still in its handler. This is the parallel-tool-call workload that
-    /// commit 4c00a64 originally enabled and that the current dispatch
-    /// shape continues to support.
+    /// Two same-helper tool calls must run concurrently — preserves the
+    /// parallel-tool-call workload enabled by 4c00a64.
     func testNonLifecycleRequestsRunConcurrently() async throws {
         let helperId = "helper-A"
         let firstStarted = expectation(description: "first handler started")
@@ -880,10 +842,6 @@ final class ReadPipeOverReadReproTests: XCTestCase {
             handler: { request in
                 if request.messageId == "m-1" {
                     firstStarted.fulfill()
-                    // Block until the test releases us. If dispatch were
-                    // serial, the second request's handler would never get
-                    // to fulfill `secondStarted` and the test would time
-                    // out at `fulfillment(of: [secondStarted])`.
                     await firstFinish.wait()
                 } else {
                     secondStarted.fulfill()
@@ -896,11 +854,8 @@ final class ReadPipeOverReadReproTests: XCTestCase {
         )
     }
 
-    /// A non-lifecycle handler that takes a long time must not block the
-    /// read loop. The read loop should continue pulling subsequent requests
-    /// off the pipe and dispatching them. We assert this by writing a
-    /// blocking request followed by a fast request and showing that the
-    /// fast request's handler runs before we release the blocking one.
+    /// A slow non-lifecycle handler must not block the read loop from
+    /// dispatching subsequent requests.
     func testReadLoopKeepsReadingDuringSlowHandler() async throws {
         let helperId = "helper-A"
         let blockerStarted = expectation(description: "blocker started")
@@ -923,19 +878,15 @@ final class ReadPipeOverReadReproTests: XCTestCase {
                 }
             },
             body: { _, _ in
-                // If the read loop were waiting for the blocker's handler to
-                // finish before reading the next line, `fastDispatched`
-                // would never fulfill and we'd hit the timeout.
                 await fulfillment(of: [blockerStarted, fastDispatched], timeout: 2.0)
                 await blockerRelease.signal()
             }
         )
     }
 
-    /// A slow non-lifecycle handler for helper A must not block dispatch of
-    /// a request from helper B. Cross-helper concurrency is the design
-    /// payoff of the per-request Task dispatch — without it, one slow
-    /// helper could starve every other helper sharing the central pipe.
+    /// A slow handler for helper A must not block dispatch of a request
+    /// from helper B — otherwise one slow helper starves every other
+    /// helper sharing the central pipe.
     func testRequestsFromDifferentHelpersAreNotSerialized() async throws {
         let slowStarted = expectation(description: "slow helper handler started")
         let fastDispatched = expectation(description: "fast helper handler ran")
@@ -963,19 +914,10 @@ final class ReadPipeOverReadReproTests: XCTestCase {
         )
     }
 
-    /// `deinitialize` is dispatched inline (the read loop blocks until its
-    /// handler returns), and it does NOT wait for previously-dispatched
-    /// non-lifecycle handlers from the same helper to finish. This pins
-    /// down the documented contract: a helper that sends `deinitialize`
-    /// while it still has in-flight tool-call requests has explicitly
-    /// signaled that it no longer cares about those responses; the host
-    /// is free to tear down the response pipe immediately.
-    ///
-    /// Test shape: queue [tool-call, deinitialize]. The tool-call handler
-    /// parks on a signal that the test never releases until after it
-    /// observes the deinitialize handler running. If deinitialize were
-    /// gated on the in-flight tool-call finishing, the deinit handler
-    /// would never run and `deinitObserved` would time out.
+    /// `deinitialize` runs without waiting for in-flight same-helper
+    /// tool-call handlers — those handlers' responses are dropped, which
+    /// is the documented contract. Backstop against a future change that
+    /// adds an in-flight barrier before deinit.
     func testDeinitializeDoesNotWaitForInFlightToolCalls() async throws {
         let helperId = "helper-A"
         let toolStarted = expectation(description: "tool-call started")
@@ -1005,36 +947,10 @@ final class ReadPipeOverReadReproTests: XCTestCase {
     }
 
     // MARK: - Shutdown log-noise tests
-    //
-    // These tests pin down a separate but related contract: the documented
-    // shutdown sequence (cancel reader Task → signalReaderWake → await
-    // Task → close pipe) must not surface any error-level log lines. Two
-    // independent noise sources used to exist on this path:
-    //
-    //   1. `AsyncLineSequence.next()` throws `CancellationError` when its
-    //      enclosing Task is cancelled. `ReadPipe.readLine()` used to log
-    //      that as "Error reading line from pipe" and wrap it as
-    //      `ReadPipeError.readError`. The consumer's catch then logged it
-    //      a second time as "Error in response reader" / "Error in read
-    //      loop". Two error lines per successful CLI invocation.
-    //   2. `signalReaderWake()` writes a sentinel `\n` to unblock the
-    //      parked read. `AsyncLineSequence` interprets that as an empty
-    //      line and yields `""`. The consumer used to JSON-decode that
-    //      empty string, fail, and log "Failed to decode response" — a
-    //      third error line on every shutdown.
-    //
-    // The tests below install a `RecordingLogHandler` on the injected
-    // logger, drive the production shutdown sequence end-to-end, and
-    // assert no error-level events were emitted from the reader-Task
-    // catch or from the empty-line decode path. They are the regression
-    // backstop for both noise sources.
 
-    /// A clean `ResponseManager.stopReading()` after the reader Task has
-    /// parked in `readLine()` must not emit any error-level logs through
-    /// the injected logger. Catches both the `CancellationError` rethrow
-    /// from `ReadPipe.readLine()` (previously logged as "Error reading
-    /// line from pipe" and "Error in response reader") and the sentinel
-    /// empty-line case (previously logged as "Failed to decode response").
+    /// The documented shutdown sequence must not emit error-level logs.
+    /// Backstop against a regression in `ReadPipe.readLine()` /
+    /// `ResponseManager`'s `CancellationError` handling.
     func testResponseManagerShutdownEmitsNoErrorLogs() async throws {
         let recorder = LogRecorder()
         let logger = Logger(label: "test.response-manager-shutdown") { _ in
@@ -1045,8 +961,7 @@ final class ReadPipeOverReadReproTests: XCTestCase {
         let manager = ResponseManager<StubResponse>(responsePipe: helperPipe, logger: logger)
         try await manager.startReading()
 
-        // External writer attached but silent — mirrors the host-side
-        // WritePipe staying open during CLI teardown.
+        // Silent external writer — mirrors a peer staying open during teardown.
         let externalWriter = try WritePipe(url: fifoURL)
         try await externalWriter.open()
 
@@ -1062,10 +977,8 @@ final class ReadPipeOverReadReproTests: XCTestCase {
         await externalWriter.close()
     }
 
-    /// Same shape as the ResponseManager test, but for `HostRequestPipe`.
-    /// The request-side reader-Task catch had the same noise problem and
-    /// the same fix; this test ensures the request-side shutdown is also
-    /// quiet.
+    /// Symmetric to `testResponseManagerShutdownEmitsNoErrorLogs` but on
+    /// the request side — `HostRequestPipe.close()` must also be quiet.
     func testHostRequestPipeShutdownEmitsNoErrorLogs() async throws {
         let recorder = LogRecorder()
         let logger = Logger(label: "test.host-request-shutdown") { _ in
@@ -1094,10 +1007,8 @@ final class ReadPipeOverReadReproTests: XCTestCase {
 
 }
 
-/// Test-only ordered append actor. Tests use it to record when handlers
-/// observe a particular state in dispatch order and then assert on the
-/// resulting sequence after the fact. Each `record(_:)` also stamps a
-/// monotonic timestamp so cross-recorder ordering can be reconstructed.
+/// Records labels with monotonic timestamps so cross-recorder ordering
+/// can be reconstructed after the fact.
 private actor AsyncOrderRecorder {
     private var entries: [(label: String, at: ContinuousClock.Instant)] = []
 
@@ -1138,16 +1049,9 @@ private actor AsyncSignal {
     }
 }
 
-/// Thread-safe in-memory store of log events captured by
-/// `RecordingLogHandler`. Tests construct a `Logger` whose factory closure
-/// returns a `RecordingLogHandler` wired to a shared `LogRecorder`, run
-/// the production code, then query `eventsAtLevel(_:)` to assert
-/// expectations.
-///
-/// Recording is synchronous (`NSLock`-guarded) rather than actor-isolated
-/// so the `LogHandler.log(...)` call site can record without spawning a
-/// Task — that avoids a race where the assertion runs before the captured
-/// event reaches the actor.
+/// Captures log events for assertions. Synchronous (NSLock-guarded) on
+/// purpose — an actor here would force `LogHandler.log` to spawn a Task,
+/// racing the assertion against capture.
 private final class LogRecorder: @unchecked Sendable {
     struct CapturedEvent: Sendable {
         let level: Logger.Level
@@ -1170,11 +1074,8 @@ private final class LogRecorder: @unchecked Sendable {
     }
 }
 
-/// `LogHandler` implementation that funnels every emitted event into a
-/// shared `LogRecorder`. The handler logs at every level (no filtering at
-/// this layer) so the test can decide what counts as noise. Required
-/// mutable `metadata`/`logLevel`/`metadataProvider` properties exist only
-/// to satisfy the protocol.
+/// `LogHandler` that forwards every event to a `LogRecorder`. Logs at
+/// every level so the test decides what counts as noise.
 private struct RecordingLogHandler: LogHandler {
     let recorder: LogRecorder
     var metadata: Logger.Metadata = [:]

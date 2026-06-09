@@ -48,30 +48,15 @@ public actor HostRequestPipe<Request: MCPRequestProtocol> {
 
     /// Start continuously reading requests from the pipe.
     ///
-    /// Lifecycle requests (`isInitialize`, `isDeinitialize`) are dispatched inline so
-    /// the read loop blocks until the handler completes. Non-lifecycle requests are
-    /// dispatched in their own Task and run concurrently with the read loop and with
-    /// each other.
+    /// Lifecycle requests (`isInitialize`, `isDeinitialize`) dispatch inline:
+    /// `EasyMCPHost.setupResponsePipe` must finish registering the response pipe
+    /// before any subsequent tool-call from the same helperId runs, and the
+    /// teardown on `deinitialize` must run immediately even if tool-call handlers
+    /// are still in flight (their responses fail to write and are dropped — a
+    /// helper that didn't want that shouldn't have sent `deinitialize` early).
     ///
-    /// Why `initialize` is inline: `EasyMCPHost` requires the response pipe for a
-    /// helperId to be opened and registered before any subsequent tool-call request
-    /// from that helperId is dispatched. Without this serialization, a tool-call
-    /// request that arrives immediately after `initialize` in the FIFO can run
-    /// before `setupResponsePipe` finishes, find no pipe registered, and return
-    /// silently — the helper then times out waiting for a response.
-    ///
-    /// Why `deinitialize` is inline: the host tears the response pipe down
-    /// immediately when deinitialize arrives. In-flight tool-call Tasks for the
-    /// same helperId that are still running when deinitialize lands will fail to
-    /// write their responses (the pipe is gone) and silently drop them. This is
-    /// intentional — a helper that sends deinitialize before all of its in-flight
-    /// requests have been answered is signaling that it no longer cares about
-    /// those responses.
-    ///
-    /// Why tool calls run concurrently: a single helper (e.g. Claude Desktop) can
-    /// invoke multiple tools in parallel. MCP matches requests to responses by
-    /// `messageId`, so handler reordering is safe at the protocol level for
-    /// non-lifecycle requests.
+    /// All other requests dispatch in their own Task so parallel tool calls from
+    /// one helper actually run in parallel; MCP matches by `messageId`.
     ///
     /// - Parameter requestHandler: Callback for handling received requests
     func startReading(requestHandler: @Sendable @escaping (Request) async -> Void) async {
@@ -92,10 +77,7 @@ public actor HostRequestPipe<Request: MCPRequestProtocol> {
                     }
                 }
             } catch is CancellationError {
-                // Normal shutdown — `stopReading()` cancelled us and
-                // `signalReaderWake()` unblocked the parked read so the
-                // iterator could observe cancellation. Logged at info,
-                // not error.
+                // Documented shutdown exit — see `ReadPipe.signalReaderWake()`.
                 logger?.info("HOST_REQUEST_PIPE: Read loop exited on cancellation")
                 isReading = false
             } catch {
