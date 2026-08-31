@@ -25,7 +25,8 @@ let package = Package(
     dependencies: [
         // Dependencies declare other packages that this package depends on.
         .package(url: "https://github.com/apple/swift-argument-parser", from: "1.3.0"),
-        .package(url: "https://github.com/modelcontextprotocol/swift-sdk", from: "0.12.1")
+        .package(url: "https://github.com/modelcontextprotocol/swift-sdk", from: "0.12.1"),
+        .package(url: "https://github.com/apple/swift-log.git", from: "1.0.0")
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
@@ -33,22 +34,28 @@ let package = Package(
         .target(
             name: "EasyMCP",
             dependencies: [
-                .product(name: "MCP", package: "swift-sdk")
+                .product(name: "MCP", package: "swift-sdk"),
+                .product(name: "Logging", package: "swift-log")
             ]),
         .target(
             name: "EasyMacMCP",
             dependencies: [
-                "EasyMCP"
+                "EasyMCP",
+                .product(name: "Logging", package: "swift-log")
             ]),
         .executableTarget(
             name: "mcpexample",
             dependencies: [
                 "EasyMCP",
-                .product(name: "ArgumentParser", package: "swift-argument-parser")
+                .product(name: "ArgumentParser", package: "swift-argument-parser"),
+                .product(name: "Logging", package: "swift-log")
             ]),
         .testTarget(
             name: "EasyMacMCPTests",
-            dependencies: ["EasyMacMCP"]
+            dependencies: [
+                "EasyMacMCP",
+                .product(name: "Logging", package: "swift-log")
+            ]
         )
     ]
 )
