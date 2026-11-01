@@ -58,6 +58,9 @@ public actor HostRequestPipe<Request: MCPRequestProtocol> {
     /// All other requests dispatch in their own Task so parallel tool calls from
     /// one helper actually run in parallel; MCP matches by `messageId`.
     ///
+    /// A line that fails to decode costs only that line. The loop ends on a read
+    /// error or cancellation, and a read error is not retried.
+    ///
     /// - Parameter requestHandler: Callback for handling received requests
     func startReading(requestHandler: @Sendable @escaping (Request) async -> Void) async {
         guard !isReading else { return }
@@ -68,12 +71,16 @@ public actor HostRequestPipe<Request: MCPRequestProtocol> {
         readingTask = Task {
             do {
                 while isReading && !Task.isCancelled {
-                    if let request = try await readRequest() {
-                        if request.isInitialize || request.isDeinitialize {
-                            await requestHandler(request)
-                        } else {
-                            Task { await requestHandler(request) }
+                    do {
+                        if let request = try await readRequest() {
+                            if request.isInitialize || request.isDeinitialize {
+                                await requestHandler(request)
+                            } else {
+                                Task { await requestHandler(request) }
+                            }
                         }
+                    } catch Error.decodeError {
+                        // `readRequest` already logged it. Only this line is lost.
                     }
                 }
             } catch is CancellationError {

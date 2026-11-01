@@ -47,7 +47,7 @@ private struct StubRequest: MCPRequestProtocol {
 /// Variant of `StubRequest` with mutable `isInitialize`/`isDeinitialize`
 /// flags so the dispatch tests can encode a mix of lifecycle and
 /// non-lifecycle requests as JSON and let `HostRequestPipe` decode them.
-private struct DispatchTestRequest: MCPRequestProtocol, Codable {
+struct DispatchTestRequest: MCPRequestProtocol, Codable {
     let helperId: String
     let messageId: String
     let isInitialize: Bool
@@ -1052,7 +1052,7 @@ private actor AsyncSignal {
 /// Captures log events for assertions. Synchronous (NSLock-guarded) on
 /// purpose — an actor here would force `LogHandler.log` to spawn a Task,
 /// racing the assertion against capture.
-private final class LogRecorder: @unchecked Sendable {
+final class LogRecorder: @unchecked Sendable {
     struct CapturedEvent: Sendable {
         let level: Logger.Level
         let message: String
@@ -1076,7 +1076,7 @@ private final class LogRecorder: @unchecked Sendable {
 
 /// `LogHandler` that forwards every event to a `LogRecorder`. Logs at
 /// every level so the test decides what counts as noise.
-private struct RecordingLogHandler: LogHandler {
+struct RecordingLogHandler: LogHandler {
     let recorder: LogRecorder
     var metadata: Logger.Metadata = [:]
     var logLevel: Logger.Level = .trace
