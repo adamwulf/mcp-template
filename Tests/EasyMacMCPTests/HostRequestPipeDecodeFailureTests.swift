@@ -161,11 +161,29 @@ final class HostRequestPipeDecodeFailureTests: XCTestCase {
         }
     }
 
-    /// A real `ReadPipe` never yields the wake sentinel as a line, because
-    /// `AsyncLineSequence` drops empty lines and cancellation surfaces as
-    /// `CancellationError`. The protocol doesn't promise that, so this covers a
-    /// `PipeReadable` whose wake does yield one: that decode failure arrives
-    /// during shutdown, and reading again would park forever.
+    /// Unterminated bytes are a real way to get a decode failure during shutdown,
+    /// for example from a helper that died mid-write: the wake sentinel's newline
+    /// completes them into a line.
+    func testCloseWithPartialLineBufferedReturnsPromptly() async throws {
+        try await withRunningHostPipe { hostPipe, writer, _, logs in
+            try await writer.write("{\"helperId\":\"partial")
+
+            // Let the reader buffer the bytes and park in read(2) again.
+            try await Task.sleep(for: .milliseconds(100))
+
+            await assertClosesPromptly(hostPipe) {
+                try? await writer.write("rescue\n")
+            }
+
+            XCTAssertLessThanOrEqual(logs.eventsAtLevel(.error).count, 1, "the partial line can cost one decode failure log, and the loop must not add another")
+        }
+    }
+
+    /// On an idle `ReadPipe` the wake sentinel never arrives as a line, because
+    /// `AsyncLineSequence` drops empty lines and cancellation then surfaces as
+    /// `CancellationError`. `PipeReadable` doesn't promise that, so this covers a
+    /// pipe whose wake does yield an empty line. With this pipe, reading again
+    /// after that decode failure would park until the test's rescue.
     func testDecodeFailureDuringCancellationExitsInsteadOfReadingAgain() async throws {
         let pipe = ScriptedPipeReader([.line("not json")])
         let hostPipe = HostRequestPipe<DispatchTestRequest>(readPipe: pipe)
