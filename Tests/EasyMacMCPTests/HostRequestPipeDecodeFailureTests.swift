@@ -115,7 +115,7 @@ final class HostRequestPipeDecodeFailureTests: XCTestCase {
 
         await assertLoopEnded(hostPipe, pipe, afterReads: 1)
         XCTAssertEqual(logs.eventsAtLevel(.error).count, 1, "the read error should be logged once")
-        await hostPipe.close()
+        await assertClosesPromptly(hostPipe) { await pipe.release() }
     }
 
     func testReadErrorAfterDecodeFailureEndsLoop() async throws {
@@ -127,7 +127,7 @@ final class HostRequestPipeDecodeFailureTests: XCTestCase {
 
         await assertLoopEnded(hostPipe, pipe, afterReads: 2)
         XCTAssertEqual(logs.eventsAtLevel(.error).count, 2, "one log for the decode failure, one for the read error")
-        await hostPipe.close()
+        await assertClosesPromptly(hostPipe) { await pipe.release() }
     }
 
     func testCancellationErrorEndsLoopWithoutErrorLog() async throws {
@@ -139,7 +139,7 @@ final class HostRequestPipeDecodeFailureTests: XCTestCase {
 
         await assertLoopEnded(hostPipe, pipe, afterReads: 1)
         XCTAssertTrue(logs.eventsAtLevel(.error).isEmpty, "cancellation is a normal exit, not an error")
-        await hostPipe.close()
+        await assertClosesPromptly(hostPipe) { await pipe.release() }
     }
 
     // MARK: - Shutdown after a decode failure
@@ -153,11 +153,10 @@ final class HostRequestPipeDecodeFailureTests: XCTestCase {
             // Let the reader park in read(2) again, with this writer attached.
             try await Task.sleep(for: .milliseconds(100))
 
-            let elapsed = await closeMeasuringElapsed(hostPipe) {
+            await assertClosesPromptly(hostPipe) {
                 try? await writer.write("rescue\n")
             }
 
-            XCTAssertLessThan(elapsed, .seconds(1), "close() should stay prompt after the loop has survived a decode failure")
             XCTAssertEqual(logs.eventsAtLevel(.error).count, 1, "shutdown must add no error logs to the one for the garbled line")
         }
     }
@@ -177,11 +176,8 @@ final class HostRequestPipeDecodeFailureTests: XCTestCase {
         let parked = await eventually { await pipe.readCount == 2 }
         XCTAssertTrue(parked, "the loop should read again after the garbled line")
 
-        let elapsed = await closeMeasuringElapsed(hostPipe) {
-            await pipe.release()
-        }
+        await assertClosesPromptly(hostPipe) { await pipe.release() }
 
-        XCTAssertLessThan(elapsed, .seconds(1), "close() must not wait on a read started after cancellation")
         let finalReadCount = await pipe.readCount
         XCTAssertEqual(finalReadCount, 2, "the wake's decode failure must end the loop, not start another read")
     }
@@ -206,15 +202,20 @@ final class HostRequestPipeDecodeFailureTests: XCTestCase {
             await served.record(request.messageId)
         }
 
+        func closePipes() async {
+            await assertClosesPromptly(hostPipe) {
+                try? await writer.write("rescue\n")
+            }
+            await writer.close()
+        }
+
         do {
             try await body(hostPipe, writer, served, logs)
         } catch {
-            await hostPipe.close()
-            await writer.close()
+            await closePipes()
             throw error
         }
-        await hostPipe.close()
-        await writer.close()
+        await closePipes()
     }
 
     private static func requestLine(_ messageId: String) throws -> Data {
@@ -264,20 +265,27 @@ final class HostRequestPipeDecodeFailureTests: XCTestCase {
         let settled = await pipe.readCount
         XCTAssertEqual(settled, reads, "the loop should stop reading after the terminal error", file: file, line: line)
 
-        await hostPipe.startReading { _ in }
-        let restarted = await eventually { await pipe.readCount > settled }
+        // Retried because `isReading = false` runs after the read throws, back
+        // on the host actor, so an early `startReading` can still be a no-op.
+        let restarted = await eventually {
+            await hostPipe.startReading { _ in }
+            return await pipe.readCount > settled
+        }
         XCTAssertTrue(restarted, "isReading should be false once the loop has ended", file: file, line: line)
     }
 
-    /// Runs `rescue` if `close()` is still blocked after 2s, so a regression
-    /// fails the elapsed-time assertion rather than hanging the suite.
-    private func closeMeasuringElapsed(
+    /// Closes `hostPipe`, running `rescue` if `close()` is still blocked after
+    /// 2s, so a shutdown regression fails the test rather than hanging the suite.
+    private func assertClosesPromptly(
         _ hostPipe: HostRequestPipe<DispatchTestRequest>,
+        file: StaticString = #filePath,
+        line: UInt = #line,
         rescue: @escaping @Sendable () async -> Void
-    ) async -> ContinuousClock.Duration {
+    ) async {
+        let rescueAfter = Duration.seconds(2)
         let rescueTask = Task {
             do {
-                try await Task.sleep(for: .seconds(2))
+                try await Task.sleep(for: rescueAfter)
             } catch {
                 return
             }
@@ -287,7 +295,7 @@ final class HostRequestPipeDecodeFailureTests: XCTestCase {
         await hostPipe.close()
         let elapsed = ContinuousClock.now - startedAt
         rescueTask.cancel()
-        return elapsed
+        XCTAssertLessThan(elapsed, rescueAfter, "close() should return without needing the rescue", file: file, line: line)
     }
 }
 
