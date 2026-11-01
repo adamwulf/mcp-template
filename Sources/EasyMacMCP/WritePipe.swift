@@ -78,7 +78,7 @@ public actor WritePipe: PipeWritable {
         }
     }
 
-    /// Opens the pipe for writing using non-blocking mode to prevent hanging
+    /// Opens the pipe for writing without blocking on open, but allowing blocking writes
     /// - Throws: WritePipeError if opening fails
     public func open() throws {
         // Make sure the path exists and is a pipe
@@ -128,9 +128,15 @@ public actor WritePipe: PipeWritable {
     /// When multiple `WritePipe` instances share one FIFO (e.g. each helper
     /// process writes to the central request pipe), cross-writer atomicity
     /// relies on POSIX `PIPE_BUF` — writes ≤ `PIPE_BUF` bytes never interleave
-    /// at the kernel level. `PIPE_BUF` is 65536 on Darwin/Linux, which
-    /// accommodates typical JSON request lines. Larger payloads can interleave
-    /// and would need explicit framing (length prefix, per-helper FIFO).
+    /// at the kernel level. `PIPE_BUF` is 512 on Darwin, and a JSON request
+    /// line can easily exceed that. Larger writes have no atomicity guarantee:
+    /// they can interleave with another writer's data and corrupt both lines.
+    /// A length prefix alone would not help, because the bytes still mix.
+    /// Avoiding that needs one FIFO per writer, or tagged frames of at most
+    /// `PIPE_BUF` bytes that the reader reassembles.
+    ///
+    /// A trailing newline does not fully frame a message, because the reader
+    /// also ends lines at other characters. See `ReadPipe.readLine()`.
     ///
     /// - Parameter data: The data to write
     /// - Throws: WritePipeError if writing fails

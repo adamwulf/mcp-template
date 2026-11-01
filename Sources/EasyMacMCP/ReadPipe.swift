@@ -149,7 +149,9 @@ public actor ReadPipe: PipeReadable {
         // lifetime of the ReadPipe. This keeps the kernel writer count above
         // zero so external writers detaching does not trigger EOF on the
         // reader. O_NONBLOCK is required on this open so it cannot block when
-        // there is currently no other writer; we never write to this FD.
+        // there is currently no other writer. It stays set because the only
+        // write to this FD is the `signalReaderWake()` sentinel, which must not
+        // block teardown on a full FIFO.
         // Failure here means we cannot guarantee the no-EOF contract, so we
         // close the reader FD and surface an error rather than silently
         // re-introducing the original CPU-spin bug.
@@ -171,22 +173,41 @@ public actor ReadPipe: PipeReadable {
 
     /// Reads a single line from the pipe.
     ///
-    /// Blocks until a line is available or the pipe is closed. Returns `nil`
-    /// only when the pipe has been closed by us (via `close()` or `deinit`);
-    /// an external writer detaching no longer ends the stream because
-    /// ReadPipe holds its own writer FD as a keepalive, so the kernel writer
-    /// count stays positive across writer churn.
+    /// Blocks until a line is available. An external writer detaching does not
+    /// end the stream, because ReadPipe holds its own writer FD as a keepalive,
+    /// so the kernel writer count stays positive across writer churn. `nil`
+    /// (end of stream) therefore needs `close()` to run while this read is
+    /// parked, which `close()` forbids. The result of doing that varies with
+    /// timing and state: this read can return `nil` or a buffered partial line,
+    /// throw `ReadPipeError.readError`, or stay parked with `close()` blocked.
+    /// Calling `readLine()` before `open()` or after `close()` throws
+    /// `ReadPipeError.pipeNotOpened`.
     ///
     /// Uses a persistent `AsyncLineSequence` iterator so chunked reads from
     /// the underlying FD don't drop buffered lines between calls.
+    ///
+    /// Known limitation: a line is whatever `AsyncLineSequence` produces, which
+    /// is not always one newline-terminated message. Measured on macOS:
+    ///
+    /// - Lines also end at CR, VT, FF, U+0085, U+2028 and U+2029. CRLF counts
+    ///   as one terminator.
+    /// - Empty lines are dropped.
+    /// - The bytes `C2`, `E2` or `E2 80` directly before a newline swallow that
+    ///   newline, so the next message joins this line. Valid UTF-8 never has
+    ///   this shape, so it takes raw `Data` or a torn write.
+    ///
+    /// `JSONEncoder` escapes CR, VT and FF but leaves U+0085, U+2028 and U+2029
+    /// unescaped. A request or response containing one of those three arrives
+    /// as two lines that don't decode, so that message is lost.
     ///
     /// `CancellationError` is rethrown unwrapped and unlogged — it's the
     /// documented exit signal for reader-Task shutdown (see
     /// `signalReaderWake()`). Any other thrown error is wrapped as
     /// `ReadPipeError.readError` and logged.
-    /// - Returns: A single line, or `nil` if the pipe has been closed.
-    /// - Throws: `CancellationError` on Task cancellation; otherwise
-    ///   `ReadPipeError` if reading fails.
+    /// - Returns: A single line, or `nil` at end of stream.
+    /// - Throws: `CancellationError` on Task cancellation;
+    ///   `ReadPipeError.pipeNotOpened` if the pipe is not open; otherwise
+    ///   `ReadPipeError.readError` if reading fails.
     public func readLine() async throws -> String? {
         guard fileHandle != nil, var iterator = lineIterator else {
             Logging.printError("Error: Pipe not opened")
@@ -210,9 +231,19 @@ public actor ReadPipe: PipeReadable {
 
     /// Wake a consumer Task that is parked in `readLine()` so it can observe
     /// cancellation. Writes a single newline byte through the keepalive writer
-    /// FD without closing anything else. The byte enters the FIFO buffer,
-    /// `AsyncBytes.Iterator` yields one stray empty line back to the consumer,
-    /// the consumer's read loop checks `Task.isCancelled` and exits.
+    /// FD without closing anything else. Cancelling alone does not unblock a
+    /// parked read; it needs this byte. What happens next depends on what the
+    /// read has buffered (measured on macOS):
+    ///
+    /// - Nothing buffered: the empty line never reaches the consumer, because
+    ///   `AsyncLineSequence` drops it. A cancelled read then throws
+    ///   `CancellationError`, which is how the consumer exits. A read that was
+    ///   not cancelled stays parked until the next real line, and `close()`
+    ///   must not run until it exits (see `readLine()`).
+    /// - Unterminated bytes buffered: the newline completes them into a line,
+    ///   and `readLine()` returns that line even though the Task is cancelled.
+    ///   The consumer handles it like any other line (it usually fails to
+    ///   decode), then exits on its `Task.isCancelled` check.
     ///
     /// Why this is separate from `close()`: closing the reader FD while a
     /// dispatch_io worker thread is parked on it deadlocks (see `close()`
@@ -221,10 +252,9 @@ public actor ReadPipe: PipeReadable {
     /// 1. Consumer cancels its reader Task.
     /// 2. Consumer calls `signalReaderWake()` to unblock the in-flight read.
     /// 3. Consumer awaits its reader Task — the reader Task gets actual
-    ///    scheduler time on the cooperative pool to receive the iterator
-    ///    yield triggered by the sentinel byte and then exit on observed
-    ///    cancellation. Without this await, the actor that called close()
-    ///    races dispatch_io's channel teardown.
+    ///    scheduler time on the cooperative pool to observe the wake and exit,
+    ///    through either of the paths above. Without this await, the actor
+    ///    that called close() races dispatch_io's channel teardown.
     /// 4. Consumer calls `close()` — now uncontended, returns immediately.
     ///
     /// Sentinel write is best-effort: we discard the result of
