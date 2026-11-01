@@ -93,7 +93,8 @@ public actor HelperResponsePipe {
     }
 
     /// Read and decode a single response from the pipe
-    /// - Returns: The decoded Response, or nil at end of stream
+    /// - Returns: The decoded Response, or nil at end of stream (see
+    ///   `ReadPipe.readLine()`, including why not to call `close()` during this read)
     /// - Throws: `Error.decodeError` if the line fails to decode, or any error
     ///   from `ReadPipe.readLine()`
     public func readResponse<Response: Decodable>() async throws -> Response? {

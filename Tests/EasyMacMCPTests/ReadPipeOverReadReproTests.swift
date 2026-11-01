@@ -488,8 +488,8 @@ final class ReadPipeOverReadReproTests: XCTestCase {
     /// must be a clean no-op — the readingTask reference was nil-ed by
     /// the first call, so cancel/await is skipped. signalReaderWake still
     /// runs: on a closed pipe its guard returns without writing, and on an
-    /// open one the newline stays queued until the next read drops it or
-    /// close() discards it. No crash, no hang.
+    /// open one the newline stays queued until a later read drops it. No
+    /// crash, no hang.
     ///
     /// Nothing reaches the decoder. With a logger attached, the first call
     /// would log one error: `HelperResponsePipe.startReading`'s loop has no

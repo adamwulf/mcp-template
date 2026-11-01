@@ -176,9 +176,12 @@ public actor ReadPipe: PipeReadable {
     /// Blocks until a line is available. An external writer detaching does not
     /// end the stream, because ReadPipe holds its own writer FD as a keepalive,
     /// so the kernel writer count stays positive across writer churn. `nil`
-    /// means end of stream, which only happens if `close()` runs while this
-    /// read is parked and no external writer is attached. Calling `readLine()`
-    /// before `open()` or after `close()` throws `ReadPipeError.pipeNotOpened`.
+    /// (end of stream) therefore needs `close()` to run while this read is
+    /// parked, which `close()` forbids. The result of doing that varies with
+    /// timing and state: this read can return `nil` or a buffered partial line,
+    /// throw `ReadPipeError.readError`, or stay parked with `close()` blocked.
+    /// Calling `readLine()` before `open()` or after `close()` throws
+    /// `ReadPipeError.pipeNotOpened`.
     ///
     /// Uses a persistent `AsyncLineSequence` iterator so chunked reads from
     /// the underlying FD don't drop buffered lines between calls.
@@ -235,7 +238,8 @@ public actor ReadPipe: PipeReadable {
     /// - Nothing buffered: the empty line never reaches the consumer, because
     ///   `AsyncLineSequence` drops it. A cancelled read then throws
     ///   `CancellationError`, which is how the consumer exits. A read that was
-    ///   not cancelled stays parked until the next real line.
+    ///   not cancelled stays parked until the next real line, and `close()`
+    ///   must not run until it exits (see `readLine()`).
     /// - Unterminated bytes buffered: the newline completes them into a line,
     ///   and `readLine()` returns that line even though the Task is cancelled.
     ///   The consumer handles it like any other line (it usually fails to
