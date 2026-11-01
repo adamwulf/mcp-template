@@ -123,7 +123,7 @@ final class ReadPipeOverReadReproTests: XCTestCase {
         let results = await readLines(from: reader, count: 2, deadlineSeconds: 3, closingWriter: writer)
 
         XCTAssertEqual(results.first ?? nil, "hello", "first readLine should return the first queued line")
-        XCTAssertEqual(results.dropFirst().first ?? nil, "world", "second readLine should return the second queued line; nil here confirms the over-read bug")
+        XCTAssertEqual(results.dropFirst().first ?? nil, "world", "second readLine should return the second queued line; nil here means the read threw or saw EOF (a line lost to over-read hangs instead)")
 
         await reader.close()
     }
@@ -146,7 +146,7 @@ final class ReadPipeOverReadReproTests: XCTestCase {
         let results = await readLines(from: reader, count: lines.count, deadlineSeconds: 5, closingWriter: writer)
 
         let received = results.compactMap { $0 }
-        XCTAssertEqual(received, lines, "all 10 lines should come back in order; missing tail entries indicate over-read")
+        XCTAssertEqual(received, lines, "all 10 lines should come back in order; missing tail entries mean a read threw or saw EOF (a line lost to over-read hangs instead)")
 
         await reader.close()
     }
@@ -271,9 +271,9 @@ final class ReadPipeOverReadReproTests: XCTestCase {
             return writer2
         }
 
-        // Bound the read with a deadline so a regression doesn't hang the
-        // test indefinitely. If the keepalive is missing, readLine() returns
-        // nil quickly (well under the deadline) and the assertion fails.
+        // If the keepalive is missing, readLine() returns nil quickly (well
+        // under the deadline) and the assertion fails. The deadline below does
+        // not bound a read that stays parked.
         let secondLine: String? = await withTaskGroup(of: String?.self) { group in
             group.addTask {
                 return try? await reader.readLine()
@@ -288,8 +288,10 @@ final class ReadPipeOverReadReproTests: XCTestCase {
                 } catch {
                     return nil
                 }
-                // Deadline genuinely fired: close the reader to unblock any
-                // hung readLine() so the test fails fast on regression.
+                // Deadline genuinely fired. With writer2 attached, close()
+                // blocks along with the parked read (see `ReadPipe.close()`),
+                // so a lost line hangs the test. It only unblocks the read if
+                // no external writer is attached.
                 await reader.close()
                 return nil
             }
@@ -489,10 +491,10 @@ final class ReadPipeOverReadReproTests: XCTestCase {
     /// open one the newline stays queued until the next read drops it or
     /// close() discards it. No crash, no hang.
     ///
-    /// Nothing reaches the decoder, but the first call does log one error:
-    /// `HelperResponsePipe.startReading`'s loop has no `CancellationError`
-    /// case, so its exit logs "Error in read loop". This test doesn't assert
-    /// on logs.
+    /// Nothing reaches the decoder. With a logger attached, the first call
+    /// would log one error: `HelperResponsePipe.startReading`'s loop has no
+    /// `CancellationError` case, so its exit logs "Error in read loop". This
+    /// test passes no logger.
     func testDoubleStopReadingIsSafe() async throws {
         let helperPipe = try HelperResponsePipe(url: fifoURL)
         try await helperPipe.open()
@@ -509,16 +511,16 @@ final class ReadPipeOverReadReproTests: XCTestCase {
     }
 
     /// HelperResponsePipe.close() while its internal reader Task is parked
-    /// in readLine() — the production code path.
+    /// in readLine() — the public `startReading(...)` path.
     ///
     /// `HelperResponsePipe.startReading(...)` owns an internal Task that
     /// loops on `readPipe.readLine()` and dispatches decoded responses to a
-    /// handler. This is how ResponseManager consumes responses in production
-    /// (see ResponseManager.swift:52-78). When the helper shuts down,
-    /// `close()` must cancel that internal Task, signal the reader to wake,
-    /// await the Task's exit, and then close the underlying ReadPipe.
+    /// handler. Production does not use it: `ResponseManager` runs its own
+    /// Task over `readLine()`, which the next test covers. `close()` must
+    /// cancel that internal Task, signal the reader to wake, await the Task's
+    /// exit, and then close the underlying ReadPipe.
     ///
-    /// Test setup mirrors production: start reading via `startReading(...)`,
+    /// Test setup: start reading via `startReading(...)`,
     /// attach an external writer that never produces data (stands in for the
     /// host-side writer staying open during shutdown), then call close().
     /// Expect prompt return.
@@ -679,10 +681,11 @@ final class ReadPipeOverReadReproTests: XCTestCase {
 
     // MARK: - Helpers
 
-    /// Reads up to `count` lines from `reader`. When the deadline expires,
-    /// closes `writer`, but that does not unblock a parked read: `ReadPipe`'s
-    /// keepalive writer FD means no EOF arrives, and this helper keeps waiting
-    /// for the read to finish. A line that never arrives hangs the test.
+    /// Reads up to `count` lines from `reader`. Always closes `writer` before
+    /// returning, either when the reads finish or at the deadline. Closing it
+    /// does not unblock a parked read: `ReadPipe`'s keepalive writer FD means
+    /// no EOF arrives, and this helper keeps waiting for the read to finish.
+    /// A line that never arrives hangs the test.
     /// Returns exactly `count` entries (any unread positions are `nil`).
     private func readLines(
         from reader: ReadPipe,

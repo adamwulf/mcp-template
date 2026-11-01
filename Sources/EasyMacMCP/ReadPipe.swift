@@ -149,7 +149,9 @@ public actor ReadPipe: PipeReadable {
         // lifetime of the ReadPipe. This keeps the kernel writer count above
         // zero so external writers detaching does not trigger EOF on the
         // reader. O_NONBLOCK is required on this open so it cannot block when
-        // there is currently no other writer; we never write to this FD.
+        // there is currently no other writer. It stays set because the only
+        // write to this FD is the `signalReaderWake()` sentinel, which must not
+        // block teardown on a full FIFO.
         // Failure here means we cannot guarantee the no-EOF contract, so we
         // close the reader FD and surface an error rather than silently
         // re-introducing the original CPU-spin bug.
