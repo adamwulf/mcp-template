@@ -80,10 +80,10 @@ struct DispatchTestRequest: MCPRequestProtocol, Codable {
 /// more bytes).
 ///
 /// These tests write multiple lines to a FIFO before the reader's first
-/// `readLine()`, then ask for them back. The tests bound execution time by
-/// closing the writer pipe after a deadline — when the writer's FD closes,
-/// any in-flight blocking read on the reader gets EOF (returns `nil`) and the
-/// actor unblocks, so assertions can run.
+/// `readLine()`, then ask for them back. Execution time is not bounded: closing
+/// the writer after the deadline sends no EOF, because `ReadPipe` holds its own
+/// keepalive writer FD. A line that never arrives hangs the test rather than
+/// failing an assertion (see `readLines(from:count:deadlineSeconds:closingWriter:)`).
 ///
 /// Run with: `swift test --filter ReadPipeOverReadReproTests`
 final class ReadPipeOverReadReproTests: XCTestCase {
@@ -171,12 +171,12 @@ final class ReadPipeOverReadReproTests: XCTestCase {
         await reader.close()
     }
 
-    /// EOF + reopen: open writer, write a line, close writer (causing EOF
-    /// on the reader's next call after the buffered line). Open writer
-    /// again, write another line. Reader's subsequent `readLine()` should
-    /// return the new line — this validates the iterator-rebuild-on-nil
-    /// branch that keeps `startReading` consumers working when a helper
-    /// disconnects and reconnects.
+    /// Writer detach + reattach: open writer, write a line, close writer. Open
+    /// writer again, write another line. Reader's subsequent `readLine()`
+    /// should return the new line. The first writer closing causes no EOF,
+    /// because `ReadPipe`'s keepalive writer FD keeps the writer count above
+    /// zero — this validates that `startReading` consumers keep working on the
+    /// same iterator when a helper disconnects and reconnects.
     func testEOFThenReopenReturnsNewLine() async throws {
         let reader = try ReadPipe(url: fifoURL)
         try await reader.open()
@@ -193,14 +193,14 @@ final class ReadPipeOverReadReproTests: XCTestCase {
         XCTAssertEqual(firstResults.first ?? nil, "first", "should receive the line written by the first writer session")
 
         // Second writer session — separate process-side close/reopen of the
-        // writer FD. The reader must rebuild its iterator after EOF and
-        // pick up the new line.
+        // writer FD. The reader saw no EOF, so its existing iterator picks up
+        // the new line.
         let writer2 = try WritePipe(url: fifoURL)
         try await writer2.open()
         try await writer2.write("second\n")
 
         let secondResults = await readLines(from: reader, count: 1, deadlineSeconds: 3, closingWriter: writer2)
-        XCTAssertEqual(secondResults.first ?? nil, "second", "after a writer disconnects and a new one attaches, readLine() should resume — nil here means the iterator wasn't rebuilt on EOF")
+        XCTAssertEqual(secondResults.first ?? nil, "second", "after a writer disconnects and a new one attaches, readLine() should resume — nil here means the reader saw EOF, so the keepalive writer FD is missing or got closed")
 
         await reader.close()
     }
@@ -328,7 +328,8 @@ final class ReadPipeOverReadReproTests: XCTestCase {
     ///
     ///   1. cancel the reader Task
     ///   2. `signalReaderWake()` to deliver a sentinel byte through the
-    ///      keepalive — wakes the dispatch_io read so the iterator can yield
+    ///      keepalive — wakes the dispatch_io read so the cancelled read can
+    ///      throw `CancellationError`
     ///   3. `await readerTask.value` — gives dispatch_io scheduler time to
     ///      drain (this is the key step — back-to-back write+close on the
     ///      same actor leaves no time for dispatch_io to run)
@@ -407,13 +408,9 @@ final class ReadPipeOverReadReproTests: XCTestCase {
     /// and quit), then the helper shuts down. The only writer on the FIFO
     /// is ReadPipe's own keepalive FD.
     ///
-    /// Without an external writer, the sentinel write in close() could
-    /// theoretically SIGPIPE if our keepalive FD were the only writer AND
-    /// it were somehow torn down before the write — this test guards
-    /// against a regression where the keepalive close-order or signal
-    /// disposition gets disturbed. With the current fix, the write goes
-    /// out, the keepalive is the sole reader-of-its-own-write (nobody
-    /// drains), then the FD is closed and torn down cleanly.
+    /// close() writes nothing: it closes the keepalive FD and then the reader
+    /// FD. With no read in flight it should return promptly — this test
+    /// guards against a regression in that teardown.
     func testCloseWithNoExternalWriterAttached() async throws {
         let reader = try ReadPipe(url: fifoURL)
         try await reader.open()
@@ -487,10 +484,15 @@ final class ReadPipeOverReadReproTests: XCTestCase {
     /// a separate cleanup path (e.g. close(), or a defer block in an
     /// error handler) also calls stopReading() / close(). The second call
     /// must be a clean no-op — the readingTask reference was nil-ed by
-    /// the first call, so cancel/await is skipped; signalReaderWake will
-    /// still run but writes a sentinel into a closed pipe is harmless
-    /// (or into an open one is one stray empty line, which the decode
-    /// loop logs and discards). No crash, no hang.
+    /// the first call, so cancel/await is skipped. signalReaderWake still
+    /// runs: on a closed pipe its guard returns without writing, and on an
+    /// open one the newline stays queued until the next read drops it or
+    /// close() discards it. No crash, no hang.
+    ///
+    /// Nothing reaches the decoder, but the first call does log one error:
+    /// `HelperResponsePipe.startReading`'s loop has no `CancellationError`
+    /// case, so its exit logs "Error in read loop". This test doesn't assert
+    /// on logs.
     func testDoubleStopReadingIsSafe() async throws {
         let helperPipe = try HelperResponsePipe(url: fifoURL)
         try await helperPipe.open()
@@ -677,9 +679,10 @@ final class ReadPipeOverReadReproTests: XCTestCase {
 
     // MARK: - Helpers
 
-    /// Reads up to `count` lines from `reader`, with a hard wall-clock
-    /// deadline. When the deadline expires, closes `writer` so any in-flight
-    /// blocking read sees EOF and returns `nil` instead of hanging the test.
+    /// Reads up to `count` lines from `reader`. When the deadline expires,
+    /// closes `writer`, but that does not unblock a parked read: `ReadPipe`'s
+    /// keepalive writer FD means no EOF arrives, and this helper keeps waiting
+    /// for the read to finish. A line that never arrives hangs the test.
     /// Returns exactly `count` entries (any unread positions are `nil`).
     private func readLines(
         from reader: ReadPipe,
@@ -704,10 +707,9 @@ final class ReadPipeOverReadReproTests: XCTestCase {
             }
             group.addTask {
                 try? await Task.sleep(for: .seconds(deadlineSeconds))
-                // Close the writer to send EOF to any blocked reader. This
-                // unblocks `readLine()` and lets the read task finish. When
-                // no writer is supplied (the caller doesn't want to disturb
-                // an in-flight writer), the deadline is purely advisory.
+                // Closing the writer sends no EOF (see the keepalive note in
+                // this helper's docs), so the deadline is purely advisory
+                // whether or not a writer is supplied.
                 await writer?.close()
                 return .deadlineFired
             }
@@ -722,8 +724,8 @@ final class ReadPipeOverReadReproTests: XCTestCase {
                     while collected.count < count { collected.append(nil) }
                     return collected
                 case .deadlineFired:
-                    // Wait for the read task to drain (it should now finish
-                    // because we just closed the writer).
+                    // Keep waiting for the read task. Closing the writer did
+                    // not unblock it, so this waits until its lines arrive.
                     continue
                 }
             }

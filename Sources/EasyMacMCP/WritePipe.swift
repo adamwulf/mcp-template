@@ -128,9 +128,14 @@ public actor WritePipe: PipeWritable {
     /// When multiple `WritePipe` instances share one FIFO (e.g. each helper
     /// process writes to the central request pipe), cross-writer atomicity
     /// relies on POSIX `PIPE_BUF` — writes ≤ `PIPE_BUF` bytes never interleave
-    /// at the kernel level. `PIPE_BUF` is 65536 on Darwin/Linux, which
-    /// accommodates typical JSON request lines. Larger payloads can interleave
-    /// and would need explicit framing (length prefix, per-helper FIFO).
+    /// at the kernel level. `PIPE_BUF` is 512 on Darwin, and a JSON request
+    /// line can easily exceed that. Larger writes have no atomicity guarantee:
+    /// they can interleave with another writer's data and corrupt both lines.
+    /// Avoiding that would need explicit framing (length prefix, per-helper
+    /// FIFO).
+    ///
+    /// A trailing newline does not fully frame a message, because the reader
+    /// also ends lines at other characters. See `ReadPipe.readLine()`.
     ///
     /// - Parameter data: The data to write
     /// - Throws: WritePipeError if writing fails
